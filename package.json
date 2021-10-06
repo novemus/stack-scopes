@@ -1,0 +1,141 @@
+{
+  "name": "stack-scopes",
+  "displayName": "Stack Scopes",
+  "description": "Analyzing C/C++ Stack Snapshots",
+  "version": "1.0.0",
+  "publisher": "novemus",
+  "author": {
+    "name": "Novemus Band"
+  },
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Debuggers"
+  ],
+  "homepage": "https://github.com/novemus/stack-scopes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/novemus/stack-scopes.git"
+  },
+  "bugs": {
+    "url": "https://github.com/novemus/stack-scopes/issues"
+  },
+  "license": "MIT",
+  "icon": "resources/icon.png",
+  "activationEvents": [
+    "onDebug"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "views": {
+      "debug": [
+        {
+          "id": "stackScopes",
+          "name": "Scopes"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "stackScopes.openStackGraph",
+        "title": "Open Stack Graph",
+        "icon": "$(graph)",
+        "enablement": "inDebugMode && debugType == 'cppdbg' || debugType == 'cppvsdbg'",
+        "category": "Stack Graph"
+      },
+      {
+        "command": "stackScopes.openSessionStackGraph",
+        "title": "Open Stack Graph for Session",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "stackScopes.colorizeByTag",
+        "title": "Colorize/Uncolorize Scope",
+        "icon": "$(color-mode)"
+      },
+      {
+        "command": "stackScopes.drawOnlyColorizedStacks",
+        "title": "Draw Only Colorized Stacks",
+        "icon": "$(screen-normal)",
+        "enablement": "inDebugMode && debugType == 'cppdbg' || debugType == 'cppvsdbg'",
+        "category": "Stack Graph"
+      },
+      {
+        "command": "stackScopes.drawAllStacks",
+        "title": "Draw All Stacks",
+        "icon": "$(screen-full)",
+        "enablement": "inDebugMode && debugType == 'cppdbg' || debugType == 'cppvsdbg'",
+        "category": "Stack Graph"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "stackScopes.openSessionStackGraph",
+          "when": "false"
+        },
+        {
+          "command": "stackScopes.colorizeByTag",
+          "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "stackScopes.openStackGraph",
+          "when": "inDebugMode && view == stackScopes",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "stackScopes.openSessionStackGraph",
+          "when": "view == stackScopes && viewItem && viewItem == 'session'",
+          "group": "inline"
+        },
+        {
+          "command": "stackScopes.colorizeByTag",
+          "when": "view == stackScopes && viewItem && viewItem != 'session'",
+          "group": "inline"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "stackScopes.drawOnlyColorizedStacks",
+          "when": "stackScopes.stackGraph && stackScopes.stackGraphMode == 'allStacks'",
+          "group": "navigation"
+        },
+        {
+          "command": "stackScopes.drawAllStacks",
+          "when": "stackScopes.stackGraph && stackScopes.stackGraphMode == 'colorizedStacks'",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/glob": "^7.1.3",
+    "@types/mocha": "^8.2.2",
+    "@types/node": "14.x",
+    "@types/vscode": "^1.60.0",
+    "@typescript-eslint/eslint-plugin": "^4.26.0",
+    "@typescript-eslint/parser": "^4.26.0",
+    "eslint": "^7.27.0",
+    "glob": "^7.1.7",
+    "mocha": "^8.4.0",
+    "typescript": "^4.3.2",
+    "vscode-test": "^1.5.2"
+  },
+  "dependencies": {},
+  "extensionDependencies": [
+    "ms-vscode.cpptools"
+  ]
+}

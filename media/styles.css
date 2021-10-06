@@ -1,0 +1,63 @@
+html, body {
+    overflow: scroll;
+}
+.container {
+    font-size: 95%;
+}
+.block {
+    display: inline-block;
+    vertical-align: bottom;
+    margin-top: 25px;
+    margin-right: 20px;
+}
+.stack {
+    border-collapse: collapse;
+    border: 1px solid var(--vscode-editorIndentGuide-background);
+    background: var(--vscode-editor-background);
+}
+.thread {
+    caption-side: bottom;
+}
+.line {
+    cursor: pointer;
+}
+.line:hover {
+    background: var(--vscode-editorHoverWidget-background);
+}
+.frame {
+    white-space: nowrap;
+    max-width: 20px;
+    min-width: 20px;
+    text-align: center;
+    vertical-align: middle;
+    color: goldenrod;
+}
+.module {
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    max-width: 80px;
+    min-width: 80px;
+    vertical-align: middle;
+    padding-left: 3px;
+    padding-right: 3px;
+}
+.function {
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    max-width: 310px;
+    min-width: 310px;
+    vertical-align: middle;
+    padding-left: 3px;
+    padding-right: 3px;
+}
+.object {
+    white-space: nowrap;
+    text-overflow: clip;
+    overflow: hidden;
+    min-width: 20px;
+    text-align: center;
+    user-select: none;
+    vertical-align: middle;
+}
