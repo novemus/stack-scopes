@@ -9,15 +9,58 @@ class Frame {
         this.obj = obj;
     }
 
-    createDomElement() {
-        const row = document.createElement('tr');
-        row.className = 'line';
+    createFrameLineDomElement(api) {
+        const line = document.createElement('tr');
+        line.className = 'line';
+        line.addEventListener('click', event => {
+            if(!event.ctrlKey) {
+                api.postMessage({ command: 'select', frame: this.id });
+            } else {
+                const elements = document.querySelectorAll('[tag=' + event.target.getAttribute('tag') + ']');
+                if (event.target.style.backgroundColor === '') {
+                    const color = '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0');
+                    elements.forEach(element => {
+                        element.style.backgroundColor = color;
+                    });
+                } else {
+                    elements.forEach(element => {
+                        element.style.backgroundColor = '';
+                    });
+                }
+            }
+        });
 
         const frameCell = document.createElement("td");
         frameCell.className = 'frame';
+        frameCell.style.color = this.frame.value === '\u25B6' ? 'goldenrod' : undefined;
         frameCell.setAttribute('title', this.frame.label);
         frameCell.setAttribute('tag', this.frame.tag);
-        frameCell.textContent = this.frame.value;
+
+        const badge = document.createElement("div");
+        badge.className = 'badge';
+        badge.textContent = this.frame.value;
+        frameCell.appendChild(badge);
+
+        frameCell.addEventListener('click', event => {
+            if (!event.ctrlKey) {
+                const scope = document.getElementById('scope-' + this.id);
+                if (scope) {
+                    if (badge.style.transform === 'rotate(90deg)') {
+                        badge.style.transform = 'rotate(0deg)';
+                        scope.style.display = 'none';
+                    } else {
+                        badge.style.transform = 'rotate(90deg)';
+                        scope.style.display = 'table-row';
+                        if (scope.childElementCount === 0) {
+                            api.postMessage({ command: 'get-scope', frame: this.id });
+                        }
+                    }
+                    event.stopPropagation();
+                } else {
+                    throw new Error('element "scope-' + this.id + '" not found');
+                }
+            }
+        });
 
         const moduleCell = document.createElement("td");
         moduleCell.className = 'module';
@@ -37,12 +80,25 @@ class Frame {
         objCell.setAttribute('tag', this.obj.tag);
         objCell.textContent = this.obj.value;
 
-        row.appendChild(frameCell);
-        row.appendChild(moduleCell);
-        row.appendChild(funcCell);
-        row.appendChild(objCell);
+        line.appendChild(frameCell);
+        line.appendChild(moduleCell);
+        line.appendChild(funcCell);
+        line.appendChild(objCell);
 
-        return row;
+        return line;
+    }
+
+    createScopeLineDomElement(api) {
+        const line = document.createElement('tr');
+        line.className = 'line';
+        line.id = 'scope-' + this.id;
+        line.style.display = 'none';
+        line.addEventListener('click', event => {
+            if(!event.ctrlKey) {
+                api.postMessage({ command: 'select', frame: this.id });
+            }
+        });
+        return line;
     }
 }
 
@@ -55,7 +111,7 @@ class Stack {
     createDomElement(api) {
         const block = document.createElement('div');
         block.className = 'block';
-        block.setAttribute('id', 'block-' + this.thread);
+        block.id = 'block-' + this.thread;
 
         const table = document.createElement("table");
         table.className = 'stack';
@@ -66,26 +122,9 @@ class Stack {
         caption.textContent = 'Thread #' + this.thread;
         table.appendChild(caption);
 
-        this.frames.forEach(item => {
-            const row = item.createDomElement();
-            row.addEventListener('click', event => {
-                if(!event.ctrlKey) {
-                    api.postMessage({ command: 'select', frame: item.id });
-                } else {
-                    const elements = document.querySelectorAll('[tag=' + event.target.getAttribute('tag') + ']');
-                    if (event.target.style.backgroundColor === '') {
-                        const color = '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0');
-                        elements.forEach(element => {
-                            element.style.backgroundColor = color;
-                        });
-                    } else {
-                        elements.forEach(element => {
-                            element.style.backgroundColor = '';
-                        });
-                    }
-                }
-            });
-            table.appendChild(row);
+        this.frames.forEach(frame => {
+            table.appendChild(frame.createFrameLineDomElement(api));
+            table.appendChild(frame.createScopeLineDomElement(api));
         });
         block.appendChild(table);
 
@@ -181,6 +220,42 @@ class Context {
             this.showColorized();
         }
     }
+
+    populateScope(scope) {
+        const line = document.getElementById('scope-' + scope.id);
+        if (!line) {
+            throw new Error('element "scope-' + scope.id + '" not found');
+        }
+
+        if (line.childElementCount > 0 || scope.variables.length === 0) {
+            return;
+        }
+
+        const cell = document.createElement('td');
+        cell.setAttribute('colspan', 4);
+
+        scope.variables.forEach(item => {
+            const row = document.createElement('div');
+            row.className = 'scope';
+
+            const name = document.createElement("span");
+            name.setAttribute('title', item.type);
+            name.className = 'var-name';
+            name.textContent = item.name + ':';
+
+            const value = document.createElement("span");
+            value.setAttribute('title', item.value);
+            value.className = 'var-value';
+            value.textContent = item.value;
+
+            row.appendChild(name);
+            row.appendChild(value);
+
+            cell.appendChild(row);
+        });
+        
+        line.appendChild(cell);
+    }
 }
 
 (function () {
@@ -208,6 +283,11 @@ class Context {
             case 'colorize-by-tag': {
                 console.log('colorize by tag');
                 context.colorizeByTag(message.tag);
+                break;
+            }
+            case 'populate-scope': {
+                console.log('populate scope');
+                context.populateScope(message.scope);
                 break;
             }
         }

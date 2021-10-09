@@ -126,6 +126,16 @@ export class StackSnapshot {
         }
         return undefined;
     }
+
+    async getFrameVariables(frame: number): Promise<readonly any[] | undefined> {
+        const scopes = await this.getScopes(frame) || [];
+        for(const scope of scopes) {
+            if (scope.name === "Locals" || scope.presentationHint === 'locals') {
+                return this.getVariables(scope.variablesReference);
+            }
+        }
+        return undefined;
+    }
 }
 
 export class DebugSessionInterceptor implements vscode.DebugAdapterTrackerFactory {

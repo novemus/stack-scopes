@@ -12,6 +12,10 @@ The main purpose of the `Stack Graph` window is to provide a possibility to anal
 
 ![Graph](https://raw.githubusercontent.com/novemus/stack-scopes/master/resources/graph.gif)
 
+Now you can unfold the context of any frame right on the graph. Click on the frame badge to expand or collapse the context widget.
+
+![Unfold](https://raw.githubusercontent.com/novemus/stack-scopes/master/resources/unfold.gif)
+
 Both the `Scopes` view and the `Stack Graph` window support revealing reference code in the source files when clicking on frame items. To achieve this on the `Stack Graph`, you need to split the editor space and move the graph window to a secondary cell.
 
 ![Reveal](https://raw.githubusercontent.com/novemus/stack-scopes/master/resources/reveal.gif)
@@ -47,6 +51,6 @@ MIT © Novemus Band
 
 ## Release Notes
 
-* v1.0.0
+* v1.1.0
 
-First release of the `stack-scopes` extension.
+Unfold the frame context directly on the stack graph.

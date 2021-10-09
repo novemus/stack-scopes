@@ -30,7 +30,10 @@ html, body {
     min-width: 20px;
     text-align: center;
     vertical-align: middle;
-    color: goldenrod;
+    user-select: none;
+}
+.badge {
+    pointer-events: none;
 }
 .module {
     white-space: nowrap;
@@ -60,4 +63,18 @@ html, body {
     text-align: center;
     user-select: none;
     vertical-align: middle;
+}
+.scope {
+    max-width: 430px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+.var-name {
+    padding-left: 10px;
+    color: var(--vscode-debugTokenExpression-name);
+}
+.var-value {
+    padding-left: 10px;
+    color: var(--vscode-debugTokenExpression-value);
 }

@@ -112,13 +112,23 @@ export class StackGraphController implements StackSnapshotReviewer {
 
         panel.webview.html = this.getHtmlSkeleton(panel);
         panel.webview.onDidReceiveMessage(
-            message => {
+            async message => {
                 switch (message.command) {
                     case 'select':
                         {
                             vscode.commands.executeCommand(
                                 'stackScopes.revealFrameScopeTreeItem', snapshot.id, parseInt(message.frame), panel.viewColumn !== vscode.ViewColumn.One
                             );
+                        }
+                    case 'get-scope':
+                        {
+                            panel.webview.postMessage({
+                                command: 'populate-scope',
+                                scope: {
+                                    id: message.frame,
+                                    variables: await snapshot.getFrameVariables(message.frame)
+                                }
+                            });
                         }
                 }
             }
@@ -127,7 +137,7 @@ export class StackGraphController implements StackSnapshotReviewer {
         vscode.commands.executeCommand('setContext', 'stackScopes.stackGraph', true);
         vscode.commands.executeCommand('setContext', 'stackScopes.stackGraphMode', this.modes.get(panel));
 
-        panel.webview.postMessage({ command: 'populate', stacks: await this.buildStacks(snapshot), topThread: snapshot.topThread });
+        panel.webview.postMessage({ command: 'populate', stacks: await this.buildStacks(snapshot) });
     }
 
     private async buildStacks(snapshot: StackSnapshot): Promise<Stack[]> {
@@ -142,7 +152,7 @@ export class StackGraphController implements StackSnapshotReviewer {
                 const frm = new Frame();
                 frm.id = frame.id;
 
-                frm.frame.value = snapshot.topThread === thread.id && frames[0] === frame ? '\u25B6' : undefined;
+                frm.frame.value = snapshot.topThread === thread.id && frames[0] === frame ? '\u25B6' : '\u003E';
                 frm.frame.label = '#' + frame.id;
                 frm.frame.tag = utils.makeFrameTag(frame.id);
 
