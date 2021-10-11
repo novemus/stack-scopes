@@ -127,14 +127,56 @@ export class StackSnapshot {
         return undefined;
     }
 
+    async getWrappedValues(reference: number): Promise<string | undefined> {
+        const variables = await this.getVariables(reference) || [];
+        let result: string = '';
+        for (const variable of variables) {
+            let value = variable.value;
+            if (variable.name.match(/^\s*\*.*$/) || variable.name.match(/^.*\[\d+\]\s*$/)) {
+                result += ' { ' + (value.length > 0 ? value : '...') + ' }';
+            } else {
+                result += ' ' + variable.name + '=' + value;
+            }
+        }
+        return '{' + (result.length > 0 ? result : '...') + ' }';
+    }
+
     async getFrameVariables(frame: number): Promise<readonly any[] | undefined> {
         const scopes = await this.getScopes(frame) || [];
         for(const scope of scopes) {
             if (scope.name === "Locals" || scope.presentationHint === 'locals') {
-                return this.getVariables(scope.variablesReference);
+                const variables = await this.getVariables(scope.variablesReference);
+                if (variables && this.session.type === 'cppdbg') {
+                    for (const variable of variables) {
+                        if (variable.variablesReference !== 0) {
+                            const value = await this.getWrappedValues(variable.variablesReference);
+                            if (variable.type.match(/^.*\*\s*$/) || variable.type.match(/^.*\[\d+\]\s*$/)) {
+                                variable.value += ' ' + value;
+                            } else {
+                                variable.value = value;
+                            }
+                        }
+                    }
+                }
+                return variables;
             }
         }
         return undefined;
+    }
+
+    async evaluateExpression(frame: number, expression: string): Promise<any | undefined> {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const result = await this.session.customRequest('evaluate', {
+                    expression: expression,
+                    frameId: frame
+                });
+                resolve(result);
+            } catch (error) {
+                console.log(error);
+                reject(error);
+            }
+        });
     }
 }
 

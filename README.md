@@ -2,23 +2,43 @@
 
 The `stack-scopes` is extension for [Visual Studio Code](https://code.visualstudio.com). It provides additional `Scopes` view on the Debug side bar for `cppdbg` and `cppvsdbg` debug profiles and offers `Stack Graph` window for convenient analysis of application stacks.
 
-## Usage
+## Сapabilities
+
+* [Build](#scopes-view) scopes tree view.
+* [Highlight](#stack-graph) shared scopes on the stack graph.
+* [Inspect](#unfold-frame-context) any number of frame contexts.
+* [Reveal](#reveal-reference-code) reference source code.
+* [Evaluate](#evaluate-dynamic-arrays-elements) elements of dynamically allocated arrays.
+
+## Scopes view ##
 
 The `Scopes` view represents stack frames grouped by locations of their scopes. This allows you to quickly find stack frames of interesting code, especially for snapshots with a large number of threads, check for mutual access to a specific context, find recursive calls, watch several frame scopes at the same time.
 
 ![Scopes](https://raw.githubusercontent.com/novemus/stack-scopes/master/resources/scopes.gif)
 
+## Stack Graph ##
+
 The main purpose of the `Stack Graph` window is to provide a possibility to analyze stacks for mutual use of modules, functions and even objects. For this you can apply color highlighting to elements you are interested in. Just click desired element in the graph with the `ctrl` key pressed or click appropriate icon on an item of the `Scopes` tree view. Click again to cancel the highlighting of the element.
 
 ![Graph](https://raw.githubusercontent.com/novemus/stack-scopes/master/resources/graph.gif)
 
-Now you can unfold the context of any frame right on the graph. Click on the frame badge to expand or collapse the context widget.
+## Unfold frame context ##
+
+You can unfold the context of any frame on the scope tree or right on the graph. Click on the frame badge to expand or collapse the context widget.
 
 ![Unfold](https://raw.githubusercontent.com/novemus/stack-scopes/master/resources/unfold.gif)
+
+## Reveal reference code ##
 
 Both the `Scopes` view and the `Stack Graph` window support revealing reference code in the source files when clicking on frame items. To achieve this on the `Stack Graph`, you need to split the editor space and move the graph window to a secondary cell.
 
 ![Reveal](https://raw.githubusercontent.com/novemus/stack-scopes/master/resources/reveal.gif)
+
+## Evaluate dynamic arrays elements ##
+
+By default, you see only first element of the dynamically allocated arrays in the scope tree, because the debugger does not know the size of the array. You can evaluate following possible elements of the array variable under its tree item.
+
+![Evaluate](https://raw.githubusercontent.com/novemus/stack-scopes/master/resources/evaluate.gif)
 
 ## Requirements
 
@@ -45,12 +65,10 @@ npm install && vsce package -o stack-scopes.vsix
 code --install-extension stack-scopes.vsix
 ```
 
+## Bugs and improvements
+
+Feel free to [report](https://github.com/novemus/stack-scopes/issues) bugs and [suggest](https://github.com/novemus/stack-scopes/issues) new features and improvements. 
+
 ## License
 
 MIT © Novemus Band
-
-## Release Notes
-
-* v1.1.0
-
-Unfold the frame context directly on the stack graph.

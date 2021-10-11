@@ -20,6 +20,12 @@ export class StackScopesDataProvider implements vscode.TreeDataProvider<ScopeDat
     readonly onDidChangeTreeData: vscode.Event<ScopeDataItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
     constructor(context: vscode.ExtensionContext) {
+        context.subscriptions.push(vscode.commands.registerCommand('stackScopes.evaluateNextArrayElement', async (item: VariableScope) => {
+            if (item) {
+                await item.evaluateNextElement();
+                this._onDidChangeTreeData.fire();
+            }
+        }));
     }
 
     getTreeItem(element: ScopeDataItem): vscode.TreeItem {
@@ -259,7 +265,7 @@ export class FrameScope extends ScopeDataItem {
                         if (scope.name === "Locals" || scope.presentationHint === 'locals') {
                             const variables = await this.getSnapshot().getVariables(scope.variablesReference) || [];
                             for (const variable of variables) {
-                                items.push(new VariableScope(variable.name, variable.value, variable.type, variable.variablesReference, this));
+                                items.push(new VariableScope(variable.evaluateName, variable.name, variable.value, variable.type, this.frame, variable.variablesReference, this));
                             }
                         }
                     }
@@ -284,10 +290,10 @@ export class FrameScope extends ScopeDataItem {
 }
 
 export class VariableScope extends ScopeDataItem {
-    private variables: Promise<VariableScope[]> | undefined = undefined;
+    private variables: Promise<ScopeDataItem[]> | undefined = undefined;
 
-    constructor(public readonly name: string, public readonly value: string, public readonly type: string, public readonly variablesReference: number, public readonly parent: ScopeDataItem) { 
-        super(name + ':', variablesReference !== 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
+    constructor(public readonly accessor: string, public readonly name: string, public readonly value: string, public readonly type: string, public readonly frame: number, public readonly variablesReference: number, public readonly parent: ScopeDataItem) { 
+        super(name.length > 0 ? name + ':' : '', variablesReference !== 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
         this.description = value;
         this.contextValue = name === 'this' ? 'this' : undefined;
         this.tooltip = type;
@@ -296,11 +302,20 @@ export class VariableScope extends ScopeDataItem {
         if (!this.variables) {
             this.variables = new Promise(async (resolve, reject) => {
                 try {
-                    const items: VariableScope[] = [];
-                    const variables = await this.getSnapshot().getVariables(this.variablesReference) || [];
-                    for (const variable of variables) {
-                        items.push(new VariableScope(variable.name, variable.value, variable.type, variable.variablesReference, this));
+                    const items: ScopeDataItem[] = [];
+
+                    if (this.type.match(/^.*\*\s*$/)) {
+                        const expression = '*(' + this.accessor + ')';
+                        const result = await this.getSnapshot().evaluateExpression(this.frame, expression);
+                        items.push(new VariableScope(expression, '', result.result, result.type, this.frame, result.variablesReference, this));
+                        items.push(new EvaluateScope(this));
+                    } else {
+                        const variables = await this.getSnapshot().getVariables(this.variablesReference) || [];
+                        for (const variable of variables) {
+                            items.push(new VariableScope(variable.evaluateName, variable.name, variable.value, variable.type, this.frame, variable.variablesReference, this));
+                        }   
                     }
+
                     resolve(items);
                 } catch (error) {
                     console.log(error);
@@ -315,6 +330,43 @@ export class VariableScope extends ScopeDataItem {
     }
     getTag() : string | undefined {
         return this.name === 'this' ? utils.makeObjectTag(this.value) : undefined;
+    }
+    getSnapshot() : StackSnapshot {
+        return this.parent.getSnapshot();
+    }
+    async evaluateNextElement() {
+        if (this.type.match(/^.*\*\s*$/)) {
+            const variables = await this.variables;
+            if (variables) {
+                const more = variables.pop();
+                const expression = '*((' + this.accessor + ')+' + (variables.length) + ')';
+                const result = await this.getSnapshot().evaluateExpression(this.frame, expression);
+                variables.push(new VariableScope(expression, '', result.result, result.type, this.frame, result.variablesReference, this));
+                variables.push(more as EvaluateScope);
+            }
+        }
+    }
+}
+
+export class EvaluateScope extends ScopeDataItem {
+    constructor(public readonly parent: ScopeDataItem) { 
+        super('', vscode.TreeItemCollapsibleState.None);
+        this.tooltip = 'more';
+        this.iconPath = new vscode.ThemeIcon('more');
+        this.command = {
+            title: 'Evaluate Array Element',
+            command: 'stackScopes.evaluateNextArrayElement',
+            arguments: [this.parent as VariableScope]
+        };
+    }
+    getChildren() : vscode.ProviderResult<ScopeDataItem[]> {
+        return null;
+    }
+    getParent() : vscode.ProviderResult<ScopeDataItem> {
+        return this.parent;
+    }
+    getTag() : string | undefined {
+        return undefined;
     }
     getSnapshot() : StackSnapshot {
         return this.parent.getSnapshot();
