@@ -8,6 +8,6 @@
 
 - Unfold the frame context directly on the stack graph.
 
-## 1.2.0 (October 14, 2021)
+## 1.2.0 (October 15, 2021)
 
 - Evaluate elements of dynamically allocated arrays.
