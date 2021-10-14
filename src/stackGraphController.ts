@@ -126,7 +126,7 @@ export class StackGraphController implements StackSnapshotReviewer {
                                 command: 'populate-scope',
                                 scope: {
                                     id: message.frame,
-                                    variables: await snapshot.getFrameVariables(message.frame)
+                                    variables: await snapshot.getWrappedFrameVariables(message.frame)
                                 }
                             });
                         }
