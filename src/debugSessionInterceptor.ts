@@ -127,52 +127,11 @@ export class StackSnapshot {
         return undefined;
     }
 
-    async getWrappedValues(reference: number): Promise<string | undefined> {
-        const variables = await this.getVariables(reference) || [];
-        let result: string = '';
-        for (const variable of variables) {
-            if (variable.name.match(/^\s*\[\d+\]\s*$/) || variable.name.match(/^\s*\*.*$/)) {
-                if (result.length > 0) {
-                    result += ', ';
-                }
-                result += variable.value;
-            } else {
-                if (result.length > 0) {
-                    result += ' ';
-                }
-                result += variable.name + '=' + variable.value;
-            }
-        }
-        return result.length > 0 ? '{' + result + '}' : result;
-    }
-
-    async getWrappedFrameVariables(frame: number): Promise<readonly any[] | undefined> {
+    async getFrameVariables(frame: number): Promise<readonly any[] | undefined> {
         const scopes = await this.getScopes(frame) || [];
         for(const scope of scopes) {
             if (scope.name === "Locals" || scope.presentationHint === 'locals') {
-                const variables = await this.getVariables(scope.variablesReference);
-                if (variables && this.session.type === 'cppdbg') {
-                    let result = [];
-                    for (const variable of variables) {
-                        if (variable.variablesReference !== 0) {
-                            let value = await this.getWrappedValues(variable.variablesReference);
-                            if (variable.type.match(/^.*\*\s*$/)) {
-                                value = variable.value + ' ' + value;
-                            }
-                            result.push({
-                                name: variable.name,
-                                type: variable.type,
-                                evaluateName: variable.evaluateName,
-                                variablesReference: variable.variablesReference,
-                                value: value
-                            });
-                        } else {
-                            result.push(variable);
-                        }
-                    }
-                    return result;
-                }
-                return variables;
+                return await this.getVariables(scope.variablesReference);
             }
         }
         return undefined;

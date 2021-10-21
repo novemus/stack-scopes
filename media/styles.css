@@ -14,20 +14,29 @@ html, body {
     border-collapse: collapse;
     border: 1px solid var(--vscode-editorIndentGuide-background);
     background: var(--vscode-editor-background);
+    table-layout: fixed;
+    width: 430px;
 }
+
+table.stack td:nth-of-type(1) {width: 20px;}
+table.stack td:nth-of-type(2) {width: 80px;}
+table.stack td:nth-of-type(3) {width: 310px;}
+table.stack td:nth-of-type(4) {width: 20px;}
+
 .thread {
     caption-side: bottom;
 }
 .line {
     cursor: pointer;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
 }
 .line:hover {
     background: var(--vscode-editorHoverWidget-background);
 }
 .frame {
     white-space: nowrap;
-    max-width: 20px;
-    min-width: 20px;
     text-align: center;
     vertical-align: middle;
     user-select: none;
@@ -39,8 +48,6 @@ html, body {
     white-space: nowrap;
     text-overflow: ellipsis;
     overflow: hidden;
-    max-width: 80px;
-    min-width: 80px;
     vertical-align: middle;
     padding-left: 3px;
     padding-right: 3px;
@@ -49,8 +56,6 @@ html, body {
     white-space: nowrap;
     text-overflow: ellipsis;
     overflow: hidden;
-    max-width: 310px;
-    min-width: 310px;
     vertical-align: middle;
     padding-left: 3px;
     padding-right: 3px;
@@ -59,19 +64,18 @@ html, body {
     white-space: nowrap;
     text-overflow: clip;
     overflow: hidden;
-    min-width: 20px;
     text-align: center;
     user-select: none;
     vertical-align: middle;
 }
-.scope {
-    max-width: 430px;
-    text-overflow: ellipsis;
-    overflow: hidden;
-    white-space: nowrap;
+.var-badge {
+    display: inline-block;
+    width: 20px;
+    text-align: center;
+    user-select: none;
 }
 .var-name {
-    padding-left: 10px;
+    padding-left: 5px;
     color: var(--vscode-debugTokenExpression-name);
 }
 .var-value {

@@ -119,16 +119,31 @@ export class StackGraphController implements StackSnapshotReviewer {
                             vscode.commands.executeCommand(
                                 'stackScopes.revealFrameScopeTreeItem', snapshot.id, parseInt(message.frame), panel.viewColumn !== vscode.ViewColumn.One
                             );
+                            break;
                         }
-                    case 'get-scope':
+                    case 'get-frame-scope':
                         {
                             panel.webview.postMessage({
                                 command: 'populate-scope',
                                 scope: {
                                     id: message.frame,
-                                    variables: await snapshot.getWrappedFrameVariables(message.frame)
+                                    scope: 'frame',
+                                    variables: await snapshot.getFrameVariables(message.frame)
                                 }
                             });
+                            break;
+                        }
+                    case 'get-variable-scope':
+                        {
+                            panel.webview.postMessage({
+                                command: 'populate-scope',
+                                scope: {
+                                    id: message.variable,
+                                    scope: 'variable',
+                                    variables: await snapshot.getVariables(message.variable)
+                                }
+                            });
+                            break;
                         }
                 }
             }

@@ -1,7 +1,8 @@
 const NORMAL_BACKGROUND = 'var(--vscode-editor-background)';
 
 class Frame {
-    constructor(id, frame, module, func, obj) {
+    constructor(api, id, frame, module, func, obj) {
+        this.api = api;
         this.id = id;
         this.frame = frame;
         this.module = module;
@@ -9,12 +10,12 @@ class Frame {
         this.obj = obj;
     }
 
-    createFrameLineDomElement(api) {
+    createFrameDomElement() {
         const line = document.createElement('tr');
         line.className = 'line';
         line.addEventListener('click', event => {
             if(!event.ctrlKey) {
-                api.postMessage({ command: 'select', frame: this.id });
+                this.api.postMessage({ command: 'select', frame: this.id });
             } else {
                 const elements = document.querySelectorAll('[tag=' + event.target.getAttribute('tag') + ']');
                 if (event.target.style.backgroundColor === '') {
@@ -43,22 +44,25 @@ class Frame {
 
         frameCell.addEventListener('click', event => {
             if (!event.ctrlKey) {
-                const scope = document.getElementById('scope-' + this.id);
+                if (badge.style.transform === 'rotate(90deg)') {
+                    badge.style.transform = 'rotate(0deg)';
+                } else {
+                    badge.style.transform = 'rotate(90deg)';
+                }
+                const scope = document.getElementById('frame-scope-' + this.id);
                 if (scope) {
-                    if (badge.style.transform === 'rotate(90deg)') {
-                        badge.style.transform = 'rotate(0deg)';
+                    if (badge.style.transform === 'rotate(0deg)') {
                         scope.style.display = 'none';
                     } else {
-                        badge.style.transform = 'rotate(90deg)';
-                        scope.style.display = 'table-row';
+                        scope.style.display = 'table-cell';
                         if (scope.childElementCount === 0) {
-                            api.postMessage({ command: 'get-scope', frame: this.id });
+                            this.api.postMessage({ command: 'get-frame-scope', frame: this.id });
                         }
                     }
-                    event.stopPropagation();
                 } else {
-                    throw new Error('element "scope-' + this.id + '" not found');
+                    throw new Error('element "frame-scope-' + this.id + '" not found');
                 }
+                event.stopPropagation();
             }
         });
 
@@ -88,27 +92,26 @@ class Frame {
         return line;
     }
 
-    createScopeLineDomElement(api) {
-        const line = document.createElement('tr');
-        line.className = 'line';
-        line.id = 'scope-' + this.id;
-        line.style.display = 'none';
-        line.addEventListener('click', event => {
-            if(!event.ctrlKey) {
-                api.postMessage({ command: 'select', frame: this.id });
-            }
-        });
-        return line;
+    createScopeDomElement() {
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.id = 'frame-scope-' + this.id;
+        cell.setAttribute('colspan', 4);
+        cell.style.display = 'none';
+
+        row.appendChild(cell);
+
+        return row;
     }
 }
 
 class Stack {
-    constructor(thread, frames) {
+    constructor(api, thread, frames) {
         this.thread = thread;
-        this.frames = frames.map(f => new Frame(f.id, f.frame, f.module, f.func, f.obj));
+        this.frames = frames.map(f => new Frame(api, f.id, f.frame, f.module, f.func, f.obj));
     }
 
-    createDomElement(api) {
+    createDomElement() {
         const block = document.createElement('div');
         block.className = 'block';
         block.id = 'block-' + this.thread;
@@ -123,8 +126,8 @@ class Stack {
         table.appendChild(caption);
 
         this.frames.forEach(frame => {
-            table.appendChild(frame.createFrameLineDomElement(api));
-            table.appendChild(frame.createScopeLineDomElement(api));
+            table.appendChild(frame.createFrameDomElement());
+            table.appendChild(frame.createScopeDomElement());
         });
         block.appendChild(table);
 
@@ -150,9 +153,9 @@ class Context {
         const container = document.getElementById('container');
         if (container) {
             stacks.forEach(item => {
-                const stack = new Stack(item.thread, item.frames);
+                const stack = new Stack(this.api, item.thread, item.frames);
                 this.stacks.push(stack);
-                container.appendChild(stack.createDomElement(this.api));
+                container.appendChild(stack.createDomElement());
             });
         } else {
             throw new Error('element "container" not found');
@@ -221,40 +224,69 @@ class Context {
         }
     }
 
-    populateScope(scope) {
-        const line = document.getElementById('scope-' + scope.id);
-        if (!line) {
-            throw new Error('element "scope-' + scope.id + '" not found');
-        }
-
-        if (line.childElementCount > 0 || scope.variables.length === 0) {
+    populateScope(data) {
+        if (data.variables.length === 0) {
             return;
         }
 
-        const cell = document.createElement('td');
-        cell.setAttribute('colspan', 4);
+        const id = (data.scope === 'frame' ? 'frame-scope-' : 'var-scope-') + data.id;
+        const container = document.getElementById(id);
+        if (!container) {
+            throw new Error('element "' + id + '" not found');
+        }
 
-        scope.variables.forEach(item => {
-            const row = document.createElement('div');
-            row.className = 'scope';
+        if (container.childElementCount > 0) {
+            return;
+        }
 
-            const name = document.createElement("span");
+        data.variables.forEach(item => {
+            const variable = document.createElement('div');
+            variable.className = 'line';
+    
+            const badge = document.createElement('div');
+            badge.className = 'var-badge';
+            badge.innerHTML = item.variablesReference ? '+' : '&ensp;';
+    
+            const name = document.createElement('span');
             name.setAttribute('title', item.type);
             name.className = 'var-name';
             name.textContent = item.name + ':';
-
-            const value = document.createElement("span");
+    
+            const value = document.createElement('span');
             value.setAttribute('title', item.value);
             value.className = 'var-value';
             value.textContent = item.value;
+    
+            variable.appendChild(badge);
+            variable.appendChild(name);
+            variable.appendChild(value);
+    
+            container.appendChild(variable);
 
-            row.appendChild(name);
-            row.appendChild(value);
+            if (item.variablesReference) {
+                const scope = document.createElement('div');
+                scope.id = 'var-scope-' + item.variablesReference;
+                scope.style.display = 'none';
+                scope.style.paddingLeft = '10px';
+                container.appendChild(scope);
 
-            cell.appendChild(row);
+                badge.addEventListener('click', event => {
+                    if (!event.ctrlKey) {
+                        if (badge.textContent === '-') {
+                            badge.textContent = '+';
+                            scope.style.display = 'none';
+                        } else {
+                            badge.textContent = '-';
+                            scope.style.display = 'block';
+                        }
+                        if (scope.childElementCount === 0) {
+                            this.api.postMessage({ command: 'get-variable-scope', variable: item.variablesReference });
+                        }
+                        event.stopPropagation();
+                    }
+                });
+            }
         });
-        
-        line.appendChild(cell);
     }
 }
 

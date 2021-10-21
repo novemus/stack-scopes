@@ -260,14 +260,9 @@ export class FrameScope extends ScopeDataItem {
             this.variables = new Promise(async (resolve, reject) => {
                 try {
                     const items: VariableScope[] = [];
-                    const scopes = await this.getSnapshot().getScopes(this.frame) || [];
-                    for(const scope of scopes) {
-                        if (scope.name === "Locals" || scope.presentationHint === 'locals') {
-                            const variables = await this.getSnapshot().getVariables(scope.variablesReference) || [];
-                            for (const variable of variables) {
-                                items.push(new VariableScope(variable.evaluateName, variable.name, variable.value, variable.type, this.frame, variable.variablesReference, this));
-                            }
-                        }
+                    const variables = await this.getSnapshot().getFrameVariables(this.frame) || [];
+                    for (const variable of variables) {
+                        items.push(new VariableScope(variable.evaluateName, variable.name, variable.value, variable.type, this.frame, variable.variablesReference, this));
                     }
                     resolve(items);
                 } catch (error) {
