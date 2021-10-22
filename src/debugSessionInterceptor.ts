@@ -151,6 +151,45 @@ export class StackSnapshot {
             }
         });
     }
+
+    async getVariableReferencesByPointer(pointer: number, depth: number, target?: any[]): Promise<any[][]> {
+        let references: number[][] = [[]];
+        if (target === undefined || target.length === 0) {
+            if (depth > 0) {
+                const threads = await this.threads() || [];
+                for(const thread of threads) {
+                    const frames = await this.frames(thread.id) || [];
+                    for(const f of frames) {
+                        const refs = await this.getVariableReferencesByPointer(pointer, depth - 1, [f]);
+                        if (refs.length > 0) {
+                            references.concat(refs);
+                        }
+                    }
+                }
+            }
+        } else {
+            const variables = target.length === 1 ? await this.getFrameVariables(target[0].id) : await this.getVariables(target[target.length - 1].variablesReference);
+            if (variables) {
+                for(const v of variables) {
+                    const evaluation = await this.evaluateExpression(target[0].id, v.type && v.type.match(/^.*\*\s*$/) ? '(void*)' + v.evaluateName : '(void*)&(' + v.evaluateName + ')');
+                    if (evaluation.result as number === pointer) {
+                        references.push([...target, v]);
+                    } else if (depth > 0 && v.variablesReference !== 0) {
+                        const refs = await this.getVariableReferencesByPointer(pointer, depth - 1, [...target, v]);
+                        if (refs.length > 0) {
+                            references.concat(refs);
+                        }
+                    }
+                }
+            }
+        }
+        return references;
+    }
+
+    async getVariableReferencesByContext(name: string, type: string, frame: number, depth: number): Promise<any[][]> {
+        const evaluation = await this.evaluateExpression(frame, type && type.match(/^.*\*\s*$/) ? '(void*)' + name: '(void*)&(' + name + ')');
+        return this.getVariableReferencesByPointer(evaluation.result as number, depth);
+    }
 }
 
 export class DebugSessionInterceptor implements vscode.DebugAdapterTrackerFactory {
