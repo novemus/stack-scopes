@@ -5,6 +5,25 @@ export interface StackSnapshotReviewer {
     onSnapshotRemoved(snapshot: StackSnapshot): void;
 }
 
+export interface Reference {
+    thread: any;
+    frame: any;
+    chain: any[];
+}
+
+class Placement implements Reference {
+    public readonly thread: any;
+    public readonly frame: any;
+    public chain: any[] = [];
+    constructor(thread?: any, frame?: any, chain?: any[]) {
+        this.thread = thread;
+        this.frame = frame;
+        if (chain) {
+            this.chain = chain;
+        }
+    }
+}
+
 export class StackSnapshot {
     public readonly id: string;
     public readonly name: string;
@@ -152,32 +171,35 @@ export class StackSnapshot {
         });
     }
 
-    async getVariableReferencesByPointer(pointer: number, depth: number, target?: any[]): Promise<any[][]> {
-        let references: number[][] = [[]];
-        if (target === undefined || target.length === 0) {
-            if (depth > 0) {
-                const threads = await this.threads() || [];
-                for(const thread of threads) {
-                    const frames = await this.frames(thread.id) || [];
-                    for(const f of frames) {
-                        const refs = await this.getVariableReferencesByPointer(pointer, depth - 1, [f]);
-                        if (refs.length > 0) {
-                            references.concat(refs);
-                        }
-                    }
+    async searchPointerReferences(pointer: number, target: Reference, depth: number): Promise<Reference[]> {
+        let references: Placement[] = [];
+        if (!target.thread) {
+            const threads = await this.threads() || [];
+            for(const thread of threads) {
+                const places = await this.searchPointerReferences(pointer, new Placement(thread, target.frame, target.chain), depth);
+                if (places.length > 0) {
+                    references = [...references, ...places];
+                }
+            }
+        } else if (!target.frame) {
+            const frames = await this.frames(target.thread.id) || [];
+            for(const frame of frames) {
+                const places = await this.searchPointerReferences(pointer, new Placement(target.thread, frame, target.chain), depth - 1);
+                if (places.length > 0) {
+                    references = [...references, ...places];
                 }
             }
         } else {
-            const variables = target.length === 1 ? await this.getFrameVariables(target[0].id) : await this.getVariables(target[target.length - 1].variablesReference);
+            const variables = target.chain.length === 0 ? await this.getFrameVariables(target.frame.id) : await this.getVariables(target.chain[target.chain.length - 1].variablesReference);
             if (variables) {
-                for(const v of variables) {
-                    const evaluation = await this.evaluateExpression(target[0].id, v.type && v.type.match(/^.*\*\s*$/) ? '(void*)' + v.evaluateName : '(void*)&(' + v.evaluateName + ')');
-                    if (evaluation.result as number === pointer) {
-                        references.push([...target, v]);
-                    } else if (depth > 0 && v.variablesReference !== 0) {
-                        const refs = await this.getVariableReferencesByPointer(pointer, depth - 1, [...target, v]);
-                        if (refs.length > 0) {
-                            references.concat(refs);
+                for(const variable of variables) {
+                    const evaluation = await this.evaluateExpression(target.frame.id, variable.type && variable.type.match(/^.*\*\s*$/) ? '(void*)' + variable.evaluateName : '(void*)&(' + variable.evaluateName + ')');
+                    if (Number(evaluation.result) === pointer) {
+                        references.push(new Placement(target.thread, target.frame, [...target.chain, variable]));
+                    } else if (depth > 0 && variable.variablesReference !== 0) {
+                        const places = await this.searchPointerReferences(pointer, new Placement(target.thread, target.frame, [...target.chain, variable]), depth - 1);
+                        if (places.length > 0) {
+                            references = [...references, ...places];
                         }
                     }
                 }
@@ -186,9 +208,9 @@ export class StackSnapshot {
         return references;
     }
 
-    async getVariableReferencesByContext(name: string, type: string, frame: number, depth: number): Promise<any[][]> {
+    async searchVariableReferences(name: string, type: string, frame: number, depth: number): Promise<Reference[]> {
         const evaluation = await this.evaluateExpression(frame, type && type.match(/^.*\*\s*$/) ? '(void*)' + name: '(void*)&(' + name + ')');
-        return this.getVariableReferencesByPointer(evaluation.result as number, depth);
+        return this.searchPointerReferences(Number(evaluation.result), new Placement(), depth);
     }
 }
 
