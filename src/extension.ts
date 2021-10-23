@@ -105,7 +105,7 @@ export function activate(context: vscode.ExtensionContext) {
                             stackScopesTreeView.reveal(item, { expand: true, select: true });
                         }
                         if (openSource) {
-                            vscode.commands.executeCommand('stackScopes.revealSourceLine', item.file, item.line > 0 ? item.line - 1 : 0);
+                            vscode.commands.executeCommand('stackScopes.revealSourceLine', item.frame.source.path, item.frame.line > 0 ? item.frame.line - 1 : 0);
                         }
                     }
                 }

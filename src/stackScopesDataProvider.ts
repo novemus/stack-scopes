@@ -77,32 +77,13 @@ export class StackScopesDataProvider implements vscode.TreeDataProvider<ScopeDat
         try {
             const threads = await snapshot.threads() || [];
             const modules = await snapshot.modules() || [];
-
             for(const thread of threads) {
+
                 const frames = await snapshot.frames(thread.id) || [];
+                for(const frame of await snapshot.frames(thread.id) || []) {
 
-                for(const frame of frames) {
-                    const scopeName = frame.name.substring(Math.max(frame.name.indexOf('!') + 1, 0));
                     const module = modules.find((m: { id: any; }) => m.id === frame.moduleId);
-
-                    let modulePath = '';
-                    let moduleName = frame.name.substring(0, Math.min(frame.name.indexOf('!'), frame.name.length));
-                    if (module) {
-                        moduleName = module.name;
-                        modulePath = module.path ? module.path : '';
-                    }
-
-                    const frameItem = sessionScope.pushFrame({
-                        frameId: frame.id,
-                        moduleId: frame.moduleId,
-                        moduleName: moduleName,
-                        modulePath: modulePath,
-                        threadId: thread.id,
-                        scopeName: scopeName,
-                        sourceFile: frame.source ? frame.source.path : '',
-                        sourceLine: frame.line,
-
-                    });
+                    const frameItem = sessionScope.pushFrame(thread, module, frame);
 
                     if (frames[0] === frame && snapshot.topThread === thread.id) {
                         topFrameItem = frameItem;
@@ -132,7 +113,6 @@ export abstract class ScopeDataItem extends vscode.TreeItem {
 export class DebugSessionScope extends ScopeDataItem {
     private modules: Map<number, ModuleScope> = new Map<number, ModuleScope>();
     private frames: Map<number, FrameScope> = new Map<number, FrameScope>();
-
     constructor(public readonly snapshot: StackSnapshot) {
         super(snapshot.name, vscode.TreeItemCollapsibleState.Collapsed);
         this.contextValue = 'session';
@@ -140,22 +120,22 @@ export class DebugSessionScope extends ScopeDataItem {
         this.tooltip = snapshot.name;
         this.iconPath = new vscode.ThemeIcon('callstack-view-session', new vscode.ThemeColor('debugIcon.stopForeground'));
     }
-    pushFrame(info: StackFrameInfo): FrameScope | undefined {
-        if (!this.modules.has(info.moduleId)) {
-            this.modules.set(info.moduleId, new ModuleScope(info.moduleId, info.moduleName, info.modulePath, this));
+    pushFrame(thread: any, module: any, frame: any): FrameScope | undefined {
+        if (!this.modules.has(frame.moduleId)) {
+            this.modules.set(frame.moduleId, new ModuleScope(module, this));
         }
-        const frame = this.modules.get(info.moduleId)?.pushFrame(info);
-        if (frame) {
-            this.frames.set(info.frameId, frame);
+        const f = this.modules.get(frame.moduleId)?.pushFrame(thread, frame);
+        if (f) {
+            this.frames.set(frame.id, f);
         }
-        return frame;
+        return f;
     }
     getChildren() : vscode.ProviderResult<ScopeDataItem[]> {
         const children = [];
         for (const child of this.modules.values()) {
             children.push(child);
         }
-        return Promise.resolve(children.sort((l, r) => l.name.localeCompare(r.name)));
+        return Promise.resolve(children.sort((l, r) => (l.label as string).localeCompare(r.label as string)));
     }
     getParent() : vscode.ProviderResult<ScopeDataItem> {
         return undefined;
@@ -173,32 +153,31 @@ export class DebugSessionScope extends ScopeDataItem {
 
 export class ModuleScope extends ScopeDataItem {
     private scopes: Map<string, FunctionScope> = new Map<string, FunctionScope>();
-
-    constructor(public readonly moduleId: number, public readonly name: string, public readonly file: string, public readonly parent: ScopeDataItem) {
-        super(name, vscode.TreeItemCollapsibleState.Collapsed);
+    constructor(public readonly module: any, public readonly parent: ScopeDataItem) {
+        super(module?.name ? module.name : '', vscode.TreeItemCollapsibleState.Collapsed);
         this.contextValue = 'module';
-        this.tooltip = file ? file : '';
+        this.tooltip = module?.path ? module.path : '';
         this.iconPath = new vscode.ThemeIcon('database', new vscode.ThemeColor('debugIcon.pauseForeground'));
     }
-    pushFrame(info: StackFrameInfo): FrameScope | undefined {
-        const key = info.scopeName + info.sourceFile;
+    pushFrame(thread: any, frame: any): FrameScope | undefined {
+        const key = frame.name + frame.source ? frame.source.path : '';
         if (!this.scopes.has(key)) {
-            this.scopes.set(key, new FunctionScope(info.scopeName, info.sourceFile, this));
+            this.scopes.set(key, new FunctionScope(frame, this));
         }
-        return this.scopes.get(key)?.pushFrame(info);
+        return this.scopes.get(key)?.pushFrame(thread, frame);
     }
     getChildren() : vscode.ProviderResult<ScopeDataItem[]> {
         const children = [];
         for (const child of this.scopes.values()) {
             children.push(child);
         }
-        return Promise.resolve(children.sort((l, r) => l.name.localeCompare(r.name)));
+        return Promise.resolve(children.sort((l, r) => (l.label as string).localeCompare(r.label as string)));
     }
     getParent() : vscode.ProviderResult<ScopeDataItem> {
         return this.parent;
     }
     getTag() : string | undefined {
-        return utils.makeModuleTag(this.moduleId);
+        return utils.makeModuleTag(this.module.id);
     }
     getSnapshot() : StackSnapshot {
         return this.parent.getSnapshot();
@@ -207,16 +186,15 @@ export class ModuleScope extends ScopeDataItem {
 
 export class FunctionScope extends ScopeDataItem {
     private frames: FrameScope[] = [];
-
-    constructor(public readonly name: string, public readonly file: string, public readonly parent: ScopeDataItem) {
-        super(name, vscode.TreeItemCollapsibleState.Collapsed);
+    constructor(public readonly frame: any, public readonly parent: ScopeDataItem) {
+        super(frame.name.substring(Math.max(frame.name.indexOf('!') + 1, 0)), vscode.TreeItemCollapsibleState.Collapsed);
         this.contextValue = 'function';
-        this.tooltip = name;
+        this.tooltip = this.label as string;
         this.iconPath = new vscode.ThemeIcon('symbol-function');
-        this.description = file !== '' ? path.parse(file).base : 'Unknown Source';
+        this.description = frame.source?.path ? path.parse(frame.source.path).base : 'Unknown Source';
     }
-    pushFrame(info: StackFrameInfo): FrameScope | undefined {
-        this.frames.push(new FrameScope(info.threadId, info.frameId, info.sourceFile, info.sourceLine, this));
+    pushFrame(thread: any, frame: any): FrameScope | undefined {
+        this.frames.push(new FrameScope(thread, frame, this));
         return this.frames[this.frames.length - 1];
     }
     getChildren() : vscode.ProviderResult<ScopeDataItem[]> {
@@ -230,7 +208,7 @@ export class FunctionScope extends ScopeDataItem {
         return this.parent;
     }
     getTag() : string | undefined {
-        return utils.makeFunctionTag(this.name, this.file);
+        return utils.makeFunctionTag(this.label as string, this.frame.source?.path);
     }
     getSnapshot() : StackSnapshot {
         return this.parent.getSnapshot();
@@ -239,19 +217,18 @@ export class FunctionScope extends ScopeDataItem {
 
 export class FrameScope extends ScopeDataItem {
     private variables: Promise<VariableScope[]> | undefined = undefined;
-
-    constructor(public readonly thread: number, public readonly frame: number, public readonly file: string, public readonly line: number, public readonly parent: ScopeDataItem) {
-        super('#' + frame, vscode.TreeItemCollapsibleState.Collapsed);
-        this.description = 'Thread #' + thread;
+    constructor(public readonly thread: any, public readonly frame: any, public readonly parent: ScopeDataItem) {
+        super('#' + frame.id, vscode.TreeItemCollapsibleState.Collapsed);
+        this.description = 'Thread #' + thread.id;
         this.contextValue = 'frame';
-        this.tooltip = file !== '' ? path.parse(file).base + ':' + line : 'Unknown Source';
+        this.tooltip = frame.source?.path ? path.parse(frame.source.path).base + ':' + frame.line : 'Unknown Source';
         this.iconPath = new vscode.ThemeIcon('debug-stackframe-focused');
 
-        if (file && file.length > 0) {
+        if (frame.source?.path) {
             this.command = {
                 title: 'Select Source Line',
                 command: 'stackScopes.revealSourceLine',
-                arguments: [file, line > 0 ? line - 1 : 0]
+                arguments: [frame.source?.path, frame.line > 0 ? frame.line - 1 : 0]
             };
         }
     }
@@ -260,9 +237,9 @@ export class FrameScope extends ScopeDataItem {
             this.variables = new Promise(async (resolve, reject) => {
                 try {
                     const items: VariableScope[] = [];
-                    const variables = await this.getSnapshot().getFrameVariables(this.frame) || [];
+                    const variables = await this.getSnapshot().getFrameVariables(this.frame.id) || [];
                     for (const variable of variables) {
-                        items.push(new VariableScope(variable.evaluateName, variable.name, variable.value, variable.type, this.frame, variable.variablesReference, this));
+                        items.push(new VariableScope(variable, this.frame, this));
                     }
                     resolve(items);
                 } catch (error) {
@@ -277,7 +254,7 @@ export class FrameScope extends ScopeDataItem {
         return this.parent;
     }
     getTag() : string | undefined {
-        return utils.makeFrameTag(this.frame);
+        return utils.makeFrameTag(this.frame.id);
     }
     getSnapshot() : StackSnapshot {
         return this.parent.getSnapshot();
@@ -286,31 +263,28 @@ export class FrameScope extends ScopeDataItem {
 
 export class VariableScope extends ScopeDataItem {
     private variables: Promise<ScopeDataItem[]> | undefined = undefined;
-
-    constructor(public readonly accessor: string, public readonly name: string, public readonly value: string, public readonly type: string, public readonly frame: number, public readonly variablesReference: number, public readonly parent: ScopeDataItem) { 
-        super(name.length > 0 ? name + ':' : '', variablesReference !== 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
-        this.description = value;
-        this.contextValue = name === 'this' ? 'this' : undefined;
-        this.tooltip = type;
+    constructor(public readonly data: any, public readonly frame: any, public readonly parent: ScopeDataItem) { 
+        super(data.name?.length > 0 ? data.name + ':' : '', data.variablesReference !== 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
+        this.description = data.value ? data.value : data.result;
+        this.contextValue = data.name === 'this' ? 'this' : undefined;
+        this.tooltip = data.type;
     }
     getChildren() : vscode.ProviderResult<ScopeDataItem[]> {
         if (!this.variables) {
             this.variables = new Promise(async (resolve, reject) => {
                 try {
                     const items: ScopeDataItem[] = [];
-
-                    if (this.type.match(/^.*\*\s*$/)) {
-                        const expression = '*(' + this.accessor + ')';
-                        const result = await this.getSnapshot().evaluateExpression(this.frame, expression);
-                        items.push(new VariableScope(expression, '', result.result, result.type, this.frame, result.variablesReference, this));
+                    if (this.data.type.match(/^.*\*\s*$/)) {
+                        const expression = '*(' + this.data.evaluateName + ')';
+                        const data = await this.getSnapshot().evaluateExpression(this.frame.id, expression);
+                        items.push(new VariableScope({ ...data, value: data.result, evaluateName: expression }, this.frame, this));
                         items.push(new EvaluateScope(this));
                     } else {
-                        const variables = await this.getSnapshot().getVariables(this.variablesReference) || [];
+                        const variables = await this.getSnapshot().getVariables(this.data.variablesReference) || [];
                         for (const variable of variables) {
-                            items.push(new VariableScope(variable.evaluateName, variable.name, variable.value, variable.type, this.frame, variable.variablesReference, this));
+                            items.push(new VariableScope(variable, this.frame, this));
                         }   
                     }
-
                     resolve(items);
                 } catch (error) {
                     console.log(error);
@@ -324,20 +298,21 @@ export class VariableScope extends ScopeDataItem {
         return this.parent;
     }
     getTag() : string | undefined {
-        return this.name === 'this' ? utils.makeObjectTag(this.value) : undefined;
+        return this.data.name === 'this' ? utils.makeObjectTag(this.data.value ? this.data.value : this.data.result) : undefined;
     }
     getSnapshot() : StackSnapshot {
         return this.parent.getSnapshot();
     }
     async evaluateNextElement() {
-        if (this.type.match(/^.*\*\s*$/)) {
+        if (this.data.type.match(/^.*\*\s*$/)) {
             const variables = await this.variables;
             if (variables) {
                 const more = variables.pop();
-                const expression = '*((' + this.accessor + ')+' + (variables.length) + ')';
-                const result = await this.getSnapshot().evaluateExpression(this.frame, expression);
-                variables.push(new VariableScope(expression, '', result.result, result.type, this.frame, result.variablesReference, this));
+                const expression = '*((' + this.data.evaluateName + ')+' + (variables.length) + ')';
+                const data = await this.getSnapshot().evaluateExpression(this.frame.id, expression);
+                variables.push(new VariableScope({ ...data, value: data.result, evaluateName: expression }, this.frame, this));
                 variables.push(more as EvaluateScope);
+                this.variables = Promise.resolve(variables);
             }
         }
     }
