@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { ScopeDataItem, StackScopesDataProvider } from './stackScopesDataProvider';
+import { ReferenceDataItem, ReferencesDataProvider } from './referencesDataProvider';
 import { StackGraphController } from './stackGraphController';
 import { DebugSessionInterceptor } from './debugSessionInterceptor';
 
@@ -10,6 +11,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     const sessionInterceptor = new DebugSessionInterceptor(context);
     const stackDataProvider = new StackScopesDataProvider(context);
+    const refsDataProvider = new ReferencesDataProvider(context);
     const stackGraphController = new StackGraphController(context);
 
     const stackScopesTreeView = vscode.window.createTreeView('stackScopes', {
@@ -17,7 +19,13 @@ export function activate(context: vscode.ExtensionContext) {
         showCollapseAll: true
       });
 
+    vscode.window.createTreeView('references', {
+        treeDataProvider: refsDataProvider,
+        showCollapseAll: true
+    });
+
     sessionInterceptor.subscribeStackSnapshot(stackDataProvider);
+    sessionInterceptor.subscribeStackSnapshot(refsDataProvider);
     sessionInterceptor.subscribeStackSnapshot(stackGraphController);
 
     if (stackScopesTreeView) {
@@ -79,7 +87,14 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.commands.executeCommand('stackScopes.openStackGraph');
             }
         });
-        vscode.commands.registerCommand('stackScopes.colorizeByTag', (item?: ScopeDataItem) => {
+        vscode.commands.registerCommand('stackScopes.colorizeByTag', (item?: vscode.TreeItem) => {
+            const snapshot = (item as ReferenceDataItem)?.getSnapshot() || (item as ScopeDataItem)?.getSnapshot();
+            const tag = (item as ReferenceDataItem)?.getTag() || (item as ScopeDataItem)?.getTag();
+            if (snapshot && tag) {
+                stackGraphController.colorizeByTag(snapshot, tag);
+            }
+        });
+        vscode.commands.registerCommand('references.colorizeByTag', (item?: ReferenceDataItem) => {
             const snapshot = item?.getSnapshot();
             const tag = item?.getTag();
             if (snapshot && tag) {

@@ -3,17 +3,6 @@ import * as path from 'path';
 import * as utils from './utils';
 import { StackSnapshotReviewer, StackSnapshot } from './debugSessionInterceptor';
 
-interface StackFrameInfo {
-    frameId: number;
-    moduleId: number;
-    moduleName: string;
-    modulePath: string;
-    threadId: number;
-    scopeName: string;
-    sourceFile: string;
-    sourceLine: number;
-}
-
 export class StackScopesDataProvider implements vscode.TreeDataProvider<ScopeDataItem>, StackSnapshotReviewer {
     private _sessions: Map<string, DebugSessionScope> = new Map<string, DebugSessionScope>();
     private _onDidChangeTreeData: vscode.EventEmitter<ScopeDataItem | undefined | null | void> = new vscode.EventEmitter<ScopeDataItem | undefined | null | void>(); 
@@ -63,7 +52,7 @@ export class StackScopesDataProvider implements vscode.TreeDataProvider<ScopeDat
         return scope ? scope.findFrame(frame) : undefined;
     }
 
-    async onSnapshotRemoved(snapshot: StackSnapshot) {
+    onSnapshotRemoved(snapshot: StackSnapshot) {
         this._sessions.delete(snapshot.id);
         this._onDidChangeTreeData.fire();
     }
@@ -80,7 +69,7 @@ export class StackScopesDataProvider implements vscode.TreeDataProvider<ScopeDat
             for(const thread of threads) {
 
                 const frames = await snapshot.frames(thread.id) || [];
-                for(const frame of await snapshot.frames(thread.id) || []) {
+                for(const frame of frames) {
 
                     const module = modules.find((m: { id: any; }) => m.id === frame.moduleId);
                     const frameItem = sessionScope.pushFrame(thread, module, frame);
@@ -115,7 +104,7 @@ export class DebugSessionScope extends ScopeDataItem {
     private frames: Map<number, FrameScope> = new Map<number, FrameScope>();
     constructor(public readonly snapshot: StackSnapshot) {
         super(snapshot.name, vscode.TreeItemCollapsibleState.Collapsed);
-        this.contextValue = 'session';
+        this.contextValue = 'scope.session';
         this.id = snapshot.id;
         this.tooltip = snapshot.name;
         this.iconPath = new vscode.ThemeIcon('callstack-view-session', new vscode.ThemeColor('debugIcon.stopForeground'));
@@ -155,12 +144,12 @@ export class ModuleScope extends ScopeDataItem {
     private scopes: Map<string, FunctionScope> = new Map<string, FunctionScope>();
     constructor(public readonly module: any, public readonly parent: ScopeDataItem) {
         super(module?.name ? module.name : '', vscode.TreeItemCollapsibleState.Collapsed);
-        this.contextValue = 'module';
+        this.contextValue = 'scope.module';
         this.tooltip = module?.path ? module.path : '';
         this.iconPath = new vscode.ThemeIcon('database', new vscode.ThemeColor('debugIcon.pauseForeground'));
     }
     pushFrame(thread: any, frame: any): FrameScope | undefined {
-        const key = frame.name + frame.source ? frame.source.path : '';
+        const key = frame.name + (frame.source ? frame.source.path : '');
         if (!this.scopes.has(key)) {
             this.scopes.set(key, new FunctionScope(frame, this));
         }
@@ -188,7 +177,7 @@ export class FunctionScope extends ScopeDataItem {
     private frames: FrameScope[] = [];
     constructor(public readonly frame: any, public readonly parent: ScopeDataItem) {
         super(frame.name.substring(Math.max(frame.name.indexOf('!') + 1, 0)), vscode.TreeItemCollapsibleState.Collapsed);
-        this.contextValue = 'function';
+        this.contextValue = 'scope.function';
         this.tooltip = this.label as string;
         this.iconPath = new vscode.ThemeIcon('symbol-function');
         this.description = frame.source?.path ? path.parse(frame.source.path).base : 'Unknown Source';
@@ -220,7 +209,7 @@ export class FrameScope extends ScopeDataItem {
     constructor(public readonly thread: any, public readonly frame: any, public readonly parent: ScopeDataItem) {
         super('#' + frame.id, vscode.TreeItemCollapsibleState.Collapsed);
         this.description = 'Thread #' + thread.id;
-        this.contextValue = 'frame';
+        this.contextValue = 'scope.frame';
         this.tooltip = frame.source?.path ? path.parse(frame.source.path).base + ':' + frame.line : 'Unknown Source';
         this.iconPath = new vscode.ThemeIcon('debug-stackframe-focused');
 
@@ -263,24 +252,24 @@ export class FrameScope extends ScopeDataItem {
 
 export class VariableScope extends ScopeDataItem {
     private variables: Promise<ScopeDataItem[]> | undefined = undefined;
-    constructor(public readonly data: any, public readonly frame: any, public readonly parent: ScopeDataItem) { 
-        super(data.name?.length > 0 ? data.name + ':' : '', data.variablesReference !== 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
-        this.description = data.value ? data.value : data.result;
-        this.contextValue = data.name === 'this' ? 'this' : undefined;
-        this.tooltip = data.type;
+    constructor(public readonly variable: any, public readonly frame: any, public readonly parent: ScopeDataItem) { 
+        super(variable.name?.length > 0 ? variable.name + ':' : '', variable.variablesReference !== 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
+        this.description = variable.value ? variable.value : variable.result;
+        this.contextValue = this.variable.name === 'this' ? 'scope.this' : 'scope.variable';
+        this.tooltip = variable.type;
     }
     getChildren() : vscode.ProviderResult<ScopeDataItem[]> {
         if (!this.variables) {
             this.variables = new Promise(async (resolve, reject) => {
                 try {
                     const items: ScopeDataItem[] = [];
-                    if (this.data.type.match(/^.*\*\s*$/)) {
-                        const expression = '*(' + this.data.evaluateName + ')';
+                    if (this.variable.type.match(/^.*\*\s*(const)?\s*$/)) {
+                        const expression = '*(' + this.variable.evaluateName + ')';
                         const data = await this.getSnapshot().evaluateExpression(this.frame.id, expression);
                         items.push(new VariableScope({ ...data, value: data.result, evaluateName: expression }, this.frame, this));
                         items.push(new EvaluateScope(this));
                     } else {
-                        const variables = await this.getSnapshot().getVariables(this.data.variablesReference) || [];
+                        const variables = await this.getSnapshot().getVariables(this.variable.variablesReference) || [];
                         for (const variable of variables) {
                             items.push(new VariableScope(variable, this.frame, this));
                         }   
@@ -298,17 +287,17 @@ export class VariableScope extends ScopeDataItem {
         return this.parent;
     }
     getTag() : string | undefined {
-        return this.data.name === 'this' ? utils.makeObjectTag(this.data.value ? this.data.value : this.data.result) : undefined;
+        return this.variable.name === 'this' ? utils.makeObjectTag(this.variable.value) : undefined;
     }
     getSnapshot() : StackSnapshot {
         return this.parent.getSnapshot();
     }
     async evaluateNextElement() {
-        if (this.data.type.match(/^.*\*\s*$/)) {
+        if (this.variable.type.match(/^.*\*\s*(const)?\s*$/)) {
             const variables = await this.variables;
             if (variables) {
                 const more = variables.pop();
-                const expression = '*((' + this.data.evaluateName + ')+' + (variables.length) + ')';
+                const expression = '*((' + this.variable.evaluateName + ')+' + (variables.length) + ')';
                 const data = await this.getSnapshot().evaluateExpression(this.frame.id, expression);
                 variables.push(new VariableScope({ ...data, value: data.result, evaluateName: expression }, this.frame, this));
                 variables.push(more as EvaluateScope);
@@ -323,6 +312,7 @@ export class EvaluateScope extends ScopeDataItem {
         super('', vscode.TreeItemCollapsibleState.None);
         this.tooltip = 'more';
         this.iconPath = new vscode.ThemeIcon('more');
+        this.contextValue = 'scope.evaluate';
         this.command = {
             title: 'Evaluate Array Element',
             command: 'stackScopes.evaluateNextArrayElement',

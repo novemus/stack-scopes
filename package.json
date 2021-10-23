@@ -33,6 +33,11 @@
         {
           "id": "stackScopes",
           "name": "Scopes"
+        },
+        {
+          "id": "references",
+          "name": "References",
+          "when": "stackScopes.showReferences"
         }
       ]
     },
@@ -53,6 +58,16 @@
         "command": "stackScopes.colorizeByTag",
         "title": "Colorize/Uncolorize Scope",
         "icon": "$(color-mode)"
+      },
+      {
+        "command": "stackScopes.searchReferences",
+        "title": "Search References",
+        "icon": "$(search)"
+      },
+      {
+        "command": "stackScopes.revealVariable",
+        "title": "Reveal Variable",
+        "icon": "$(list-tree)"
       },
       {
         "command": "stackScopes.drawOnlyColorizedStacks",
@@ -78,6 +93,14 @@
         {
           "command": "stackScopes.colorizeByTag",
           "when": "false"
+        },
+        {
+          "command": "stackScopes.searchReferences",
+          "when": "false"
+        },
+        {
+          "command": "stackScopes.revealVariable",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -90,12 +113,22 @@
       "view/item/context": [
         {
           "command": "stackScopes.openSessionStackGraph",
-          "when": "view == stackScopes && viewItem && viewItem == 'session'",
+          "when": "viewItem == 'scope.session'",
           "group": "inline"
         },
         {
           "command": "stackScopes.colorizeByTag",
-          "when": "view == stackScopes && viewItem && viewItem != 'session'",
+          "when": "viewItem == 'scope.frame' || viewItem == 'scope.this' || viewItem == 'scope.function' || viewItem == 'scope.module' || viewItem == 'reference.frame' || viewItem == 'reference.this'",
+          "group": "inline"
+        },
+        {
+          "command": "stackScopes.searchReferences",
+          "when": "viewItem == 'scope.this' || viewItem == 'scope.variable'",
+          "group": "inline"
+        },
+        {
+          "command": "stackScopes.revealVariable",
+          "when": "viewItem == 'scope.this' || viewItem == 'scope.variable' || viewItem == 'reference.this' || viewItem == 'reference.place'",
           "group": "inline"
         }
       ],
