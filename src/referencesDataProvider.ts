@@ -9,23 +9,31 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
     private _sessions: Map<string, DebugSessionReference> = new Map<string, DebugSessionReference>();
     private _onDidChangeTreeData: vscode.EventEmitter<ReferenceDataItem | undefined | null | void> = new vscode.EventEmitter<ReferenceDataItem | undefined | null | void>(); 
     readonly onDidChangeTreeData: vscode.Event<ReferenceDataItem | undefined | null | void> = this._onDidChangeTreeData.event;
-
     constructor(context: vscode.ExtensionContext) {
-        vscode.commands.registerCommand('stackScopes.searchReferences', (item?: ScopeDataItem) => {
-            this.appendSearch(item);
-        });
+        context.subscriptions.push(
+            vscode.commands.registerCommand('stackScopes.searchReferences', (item: ScopeDataItem) => {
+                if (item instanceof VariableScope) {
+                    this.makeBunch(item as VariableScope);
+                }
+            })
+        );
+        context.subscriptions.push(
+            vscode.commands.registerCommand('stackScopes.removeReferenceBunch', (item: ReferenceDataItem) => {
+                if (item instanceof SearchReference) {
+                    this.removeBunch(item as SearchReference);
+                }
+            })
+        );
+        context.subscriptions.push(
+            vscode.commands.registerCommand('stackScopes.clearReferenceTree', () => {
+                this.clear();
+            })
+        );
     }
     onSnapshotRemoved(snapshot: StackSnapshot) {
         this._sessions.delete(snapshot.id);
         this._onDidChangeTreeData.fire();
-
-        let show = false;
-        this._sessions.forEach(session => {
-            if (session.bunches.size > 0) {
-                show = true;
-            }
-        });
-        vscode.commands.executeCommand('setContext', 'stackScopes.showReferences', show);
+        this.refreshVisibility();
     }
     onSnapshotCreated(snapshot: StackSnapshot) {
         this._sessions.set(snapshot.id, new DebugSessionReference(snapshot));
@@ -58,15 +66,76 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
         }
         return element.getParent();
     }
-    async appendSearch(item?: ScopeDataItem) {
-        const scope = item as VariableScope;
+    async makeBunch(scope: VariableScope) {
         const snapshot = scope.getSnapshot();
-        const session = this._sessions.get(snapshot.id) as DebugSessionReference;
+        const session = this._sessions.get(snapshot.id);
         if (session) {
-            await session.makeBunch(scope.variable, scope.frame);
-            this._onDidChangeTreeData.fire();
-            vscode.commands.executeCommand('setContext', 'stackScopes.showReferences', true);
+            const input = await vscode.window.showInputBox({
+                placeHolder: 'Specify the search depth. By default, only in the frame scopes.',
+                validateInput: text => {
+                    if (text.length > 0) {
+                        const depth = parseInt(text);
+                        if (isNaN(depth) || depth <= 0) {
+                            return 'type a number more than 0';
+                        };
+                    }
+                    return undefined;
+                }
+            });
+            const depth = input && input.length > 0 ? parseInt(input) : 1;
+            vscode.window.withProgress({
+                location: vscode.ProgressLocation.Window,
+                title: 'Search references for "' + scope.variable.name + '"',
+                cancellable: true
+            }, async (progress, token) => {
+                
+                const { variablesReference } = await snapshot.evaluateExpression(scope.frame.id, '*(' + scope.variable.evaluateName + ')');
+                const { result } = variablesReference !== 0 
+                    ? await snapshot.evaluateExpression(scope.frame.id, '(void*)&*(' + scope.variable.evaluateName + '),x')
+                    : await snapshot.evaluateExpression(scope.frame.id, '(void*)&(' + scope.variable.evaluateName + '),x');
+
+                const name = 'pointer=' + result + ' depth=' + depth;
+                const references = await snapshot.searchPointerReferences(parseInt(result), depth, {
+                    stage: value => {
+                        const percent = 100.0 - value / depth * 100;
+                        progress.report({ increment: percent, message: percent + '%' });
+                    }, broken: () => {
+                        return token.isCancellationRequested;
+                    }
+                });
+
+                const item = session.pushBunch(name, references);
+
+                this._onDidChangeTreeData.fire();
+                vscode.commands.executeCommand('setContext', 'stackScopes.showReferences', true);
+                vscode.commands.executeCommand('stackScopes.revealReferenceTreeItem', item);
+            });
         }
+    }
+    removeBunch(bunch: SearchReference) {
+        const snapshot = bunch.getSnapshot();
+        const session = this._sessions.get(snapshot.id);
+        if (session) {
+            session.bunches.delete(bunch.name);
+            this._onDidChangeTreeData.fire();
+            this.refreshVisibility();
+        }
+    }
+    clear() {
+        for (const session of this._sessions.values()) {
+            session.bunches.clear();
+        }
+        this._onDidChangeTreeData.fire();
+        this.refreshVisibility();
+    }
+    refreshVisibility() {
+        let show = false;
+        this._sessions.forEach(session => {
+            if (session.bunches.size > 0) {
+                show = true;
+            }
+        });
+        vscode.commands.executeCommand('setContext', 'stackScopes.showReferences', show);
     }
 }
 
@@ -86,16 +155,10 @@ export class DebugSessionReference extends ScopeDataItem {
         this.tooltip = snapshot.name;
         this.iconPath = new vscode.ThemeIcon('callstack-view-session', new vscode.ThemeColor('debugIcon.stopForeground'));
     }
-    async makeBunch(variable: any, frame: any) {
-        const evaluation = await this.snapshot.evaluateExpression(
-            frame.id,
-            variable.type && variable.type.match(/^.*\*\s*(const)?\s*$/) 
-                ? '(size_t)' + variable.evaluateName + ',x'
-                : '(size_t)&(' + variable.evaluateName + '),x'
-            );
-        const name = evaluation.result + ' depth=' + 3;
-        const references = await this.snapshot.searchPointerReferences(Number(evaluation.result), new Reference(), 3);
-        this.bunches.set(name, new SearchReference(name, references, this));
+    pushBunch(name: string, references: Reference[]) : SearchReference {
+        const bunch = new SearchReference(name, references, this);
+        this.bunches.set(name, bunch);
+        return bunch;
     }
     getChildren() : vscode.ProviderResult<ReferenceDataItem[]> {
         const children = [];
@@ -151,7 +214,7 @@ export class SearchReference extends ReferenceDataItem {
 export class FrameReference extends ReferenceDataItem {
     private chains: Map<number, PlaceReference> = new Map<number, PlaceReference>();
     constructor(public readonly thread: any, public readonly frame: any, public readonly parent: ReferenceDataItem) {
-        super(frame.name, vscode.TreeItemCollapsibleState.Expanded);
+        super(frame.name, vscode.TreeItemCollapsibleState.Collapsed);
         this.contextValue = 'reference.frame';
         this.description = 'Thread #' + thread.id;
         this.tooltip = frame.source && frame.source.path !== '' ? path.parse(frame.source.path).base + ':' + frame.line : 'Unknown Source';
@@ -199,11 +262,11 @@ export class FrameReference extends ReferenceDataItem {
 
 export class PlaceReference extends ReferenceDataItem {
     private chains: Map<number, PlaceReference> = new Map<number, PlaceReference>();
-    constructor(public readonly place: any, public readonly parent: ReferenceDataItem) {
-        super(place.name + ':', vscode.TreeItemCollapsibleState.None);
-        this.contextValue = place.name === 'this' ? 'reference.this' : 'reference.place';
-        this.description = place.type;
-        this.tooltip = place.value;
+    constructor(public readonly variable: any, public readonly parent: ReferenceDataItem) {
+        super(variable.name + ':', vscode.TreeItemCollapsibleState.None);
+        this.contextValue = variable.name === 'this' ? 'reference.this' : 'reference.place';
+        this.description = variable.type;
+        this.tooltip = variable.value;
     }
     pushReference(chain: any[]) {
         if (chain.length === 0) {
@@ -234,6 +297,6 @@ export class PlaceReference extends ReferenceDataItem {
         return this.parent.getSnapshot();
     }
     getTag() : string | undefined {
-        return this.place.name === 'this' ? utils.makeObjectTag(this.place.value) : undefined;
+        return this.variable.name === 'this' ? utils.makeObjectTag(this.variable.value) : undefined;
     }
 }

@@ -1,15 +1,15 @@
-function hash(value: string | undefined): string {
+export function hash(value: string | undefined): number {
     let hash: number = 0;
  
     if (!value || value.length === 0) {
-        return hash.toString();
+        return hash;
     } 
     for (let i = 0; i < value.length; i++) {
         let char = value.charCodeAt(i);
         hash = ((hash << 5) - hash) + char;
         hash = hash & hash;
     }
-    return hash.toString();
+    return hash;
 }
 
 function toHexString(value: string): string {
@@ -33,7 +33,7 @@ export function makeFrameTag(frameId: any): string {
 }
 
 export function makeFunctionTag(name?: string, path?: string): string {
-    return 'func-' + toHexString(hash(name)) + toHexString(hash(path));
+    return 'func-' + toHexString(hash(name).toString()) + toHexString(hash(path).toString());
 }
 
 export function makeObjectTag(value: any): string {

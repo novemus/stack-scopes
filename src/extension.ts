@@ -19,7 +19,7 @@ export function activate(context: vscode.ExtensionContext) {
         showCollapseAll: true
       });
 
-    vscode.window.createTreeView('references', {
+    const referencesTreeView = vscode.window.createTreeView('references', {
         treeDataProvider: refsDataProvider,
         showCollapseAll: true
     });
@@ -29,12 +29,13 @@ export function activate(context: vscode.ExtensionContext) {
     sessionInterceptor.subscribeStackSnapshot(stackGraphController);
 
     if (stackScopesTreeView) {
-        context.subscriptions.push(vscode.commands.registerCommand('stackScopes.revealSourceLine', (source: string, line: number) => {
+        context.subscriptions.push(
+            vscode.commands.registerCommand('stackScopes.revealSourceLine', (source: string, line: number) => {
             fs.stat(source, (error, stats) => {
                 if (error?.code) {
                     return vscode.window.showWarningMessage(error.message);
                 } else if(!stats.isFile()) {
-                    return vscode.window.showWarningMessage("Wrong file " + source);
+                    return vscode.window.showWarningMessage('Wrong file ' + source);
                 }
                 var setting: vscode.Uri = vscode.Uri.file(source);
                 vscode.workspace.openTextDocument(setting).then(document => {
@@ -53,11 +54,19 @@ export function activate(context: vscode.ExtensionContext) {
                 });
             });
         }));
-        context.subscriptions.push(vscode.commands.registerCommand('stackScopes.revealScopeTreeItem', (item: ScopeDataItem) => {
+        context.subscriptions.push(
+            vscode.commands.registerCommand('stackScopes.revealScopeTreeItem', (item: ScopeDataItem) => {
             if (stackScopesTreeView.visible) {
                 stackScopesTreeView.reveal(item, { expand: true, select: false  });
             }
         }));
+        context.subscriptions.push(
+            vscode.commands.registerCommand('stackScopes.revealReferenceTreeItem', (item: ReferenceDataItem) => {
+                if (referencesTreeView.visible) {
+                    referencesTreeView.reveal(item, { expand: true, select: false  });
+                }
+            })
+        );
         context.subscriptions.push(
             vscode.commands.registerCommand('stackScopes.openStackGraph', () => {
                 const session = vscode.debug.activeDebugSession;
@@ -65,7 +74,7 @@ export function activate(context: vscode.ExtensionContext) {
                 if (snapshot) {
                     vscode.window.withProgress({
                         location: vscode.ProgressLocation.Window,
-                        title: "Building Stack Graph...",
+                        title: 'Building Stack Graph...',
                         cancellable: false
                     }, () => {
                         return stackGraphController.openGraph(snapshot);
@@ -73,12 +82,13 @@ export function activate(context: vscode.ExtensionContext) {
                 }
             })
         );
-        vscode.commands.registerCommand('stackScopes.openSessionStackGraph', (item?: ScopeDataItem) => {
+        context.subscriptions.push(
+            vscode.commands.registerCommand('stackScopes.openSessionStackGraph', (item?: ScopeDataItem) => {
             const snapshot = item?.getSnapshot();
             if (snapshot) {
                 vscode.window.withProgress({
                     location: vscode.ProgressLocation.Window,
-                    title: "Building Stack Graph...",
+                    title: 'Building Stack Graph...',
                     cancellable: false
                 }, () => {
                     return stackGraphController.openGraph(snapshot);
@@ -86,21 +96,16 @@ export function activate(context: vscode.ExtensionContext) {
             } else {
                 vscode.commands.executeCommand('stackScopes.openStackGraph');
             }
-        });
-        vscode.commands.registerCommand('stackScopes.colorizeByTag', (item?: vscode.TreeItem) => {
-            const snapshot = (item as ReferenceDataItem)?.getSnapshot() || (item as ScopeDataItem)?.getSnapshot();
-            const tag = (item as ReferenceDataItem)?.getTag() || (item as ScopeDataItem)?.getTag();
-            if (snapshot && tag) {
-                stackGraphController.colorizeByTag(snapshot, tag);
-            }
-        });
-        vscode.commands.registerCommand('references.colorizeByTag', (item?: ReferenceDataItem) => {
-            const snapshot = item?.getSnapshot();
-            const tag = item?.getTag();
-            if (snapshot && tag) {
-                stackGraphController.colorizeByTag(snapshot, tag);
-            }
-        });
+        }));
+        context.subscriptions.push(
+            vscode.commands.registerCommand('stackScopes.colorizeByTag', (item: ReferenceDataItem | ScopeDataItem) => {
+                const snapshot = item.getSnapshot();
+                const tag = item.getTag();
+                if (snapshot && tag) {
+                    stackGraphController.colorizeByTag(snapshot, tag);
+                }
+            })
+        );
         context.subscriptions.push(
             vscode.commands.registerCommand('stackScopes.drawOnlyColorizedStacks', () => {
                 stackGraphController.drawOnlyColorizedStacksOnActiveGraph();
