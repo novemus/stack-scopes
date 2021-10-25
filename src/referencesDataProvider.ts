@@ -88,14 +88,21 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
                 title: 'Search references for "' + scope.variable.name + '"',
                 cancellable: true
             }, async (progress, token) => {
-                
-                const { variablesReference } = await snapshot.evaluateExpression(scope.frame.id, '*(' + scope.variable.evaluateName + ')');
-                const { result } = variablesReference !== 0 
-                    ? await snapshot.evaluateExpression(scope.frame.id, '(void*)&*(' + scope.variable.evaluateName + '),x')
-                    : await snapshot.evaluateExpression(scope.frame.id, '(void*)&(' + scope.variable.evaluateName + '),x');
 
-                const name = 'pointer=' + result + ' depth=' + depth;
-                const references = await snapshot.searchPointerReferences(parseInt(result), depth, {
+                let pointer = '';
+                if (scope.variable.memoryReference !== undefined && parseInt(scope.variable.variablesReference) !== 0) {
+                    pointer = scope.variable.memoryReference;
+                } else if (scope.variable.memoryReference !== undefined && scope.variable.value?.match(/^(0x[0-9A-Fa-f]+).*$/)) {
+                    if (parseInt(scope.variable.memoryReference) === parseInt(scope.variable.value.match(/^(0x[0-9A-Fa-f]+).*$/)[1])) {
+                        pointer = scope.variable.memoryReference;
+                    }
+                } else {
+                    const { memoryReference } = await snapshot.evaluateExpression(scope.frame.id, '(void*)&(' + scope.variable.evaluateName + '),x');
+                    pointer = memoryReference;
+                }
+
+                const name = 'pointer=' + pointer + ' depth=' + depth;
+                const references = await snapshot.searchPointerReferences(parseInt(pointer), depth, {
                     stage: value => {
                         const percent = 100.0 - value / depth * 100;
                         progress.report({ increment: percent, message: percent + '%' });
@@ -212,7 +219,7 @@ export class SearchReference extends ReferenceDataItem {
 }
 
 export class FrameReference extends ReferenceDataItem {
-    private chains: Map<number, PlaceReference> = new Map<number, PlaceReference>();
+    private chains: Map<string, PlaceReference> = new Map<string, PlaceReference>();
     constructor(public readonly thread: any, public readonly frame: any, public readonly parent: ReferenceDataItem) {
         super(frame.name, vscode.TreeItemCollapsibleState.Collapsed);
         this.contextValue = 'reference.frame';
@@ -231,10 +238,10 @@ export class FrameReference extends ReferenceDataItem {
         if (chain.length === 0) {
             return;
         }
-        if (!this.chains.has(chain[0].variablesReference)) {
-            this.chains.set(chain[0].variablesReference, new PlaceReference(chain[0], this));
+        if (!this.chains.has(chain[0].name)) {
+            this.chains.set(chain[0].name, new PlaceReference(chain[0], this));
         }
-        const place = this.chains.get(chain[0].variablesReference) as PlaceReference;
+        const place = this.chains.get(chain[0].name) as PlaceReference;
         if (chain.length > 1) {
             place.pushReference(chain.slice(1));
             place.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;

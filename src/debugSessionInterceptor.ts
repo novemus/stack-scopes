@@ -118,7 +118,7 @@ export class StackSnapshot {
                         filter: undefined,
                         start: 0,
                         count: undefined,
-                        format: undefined
+                        format: { hex: false }
                     });
                     resolve(variables);
                 } catch (error) {
@@ -205,12 +205,19 @@ export class StackSnapshot {
                     if (progress.broken()) {
                         return references;
                     }
-                    const { variablesReference } = await this.evaluateExpression(target.frame.id, '*(' + variable.evaluateName + ')');
-                    const { result } = variablesReference !== 0 
-                        ? await this.evaluateExpression(target.frame.id, '(void*)&*(' + variable.evaluateName + ')')
-                        : await this.evaluateExpression(target.frame.id, '(void*)&(' + variable.evaluateName + ')');
 
-                    const ptr = parseInt(result);
+                    let ptr = 0;
+                    if (variable.memoryReference !== undefined && parseInt(variable.variablesReference) !== 0) {
+                        ptr = parseInt(variable.memoryReference);
+                    } else if (variable.memoryReference !== undefined && variable.value?.match(/^(0x[0-9A-Fa-f]+).*$/)) {
+                        if (parseInt(variable.memoryReference) === parseInt(variable.value.match(/^(0x[0-9A-Fa-f]+).*$/)[1])) {
+                            ptr = parseInt(variable.memoryReference);
+                        }
+                    } else {
+                        const { memoryReference } = await this.evaluateExpression(target.frame.id, '(void*)&(' + variable.evaluateName + ')');
+                        ptr = parseInt(memoryReference);
+                    }
+
                     if (ptr === pointer) {
                         references.push(new Reference(target.thread, target.frame, [...target.chain, { ...variable, pointer: ptr }]));
                     }
