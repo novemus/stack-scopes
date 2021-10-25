@@ -85,7 +85,7 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
             const depth = input && input.length > 0 ? parseInt(input) : 1;
             vscode.window.withProgress({
                 location: vscode.ProgressLocation.Window,
-                title: 'Search references for "' + scope.variable.name + '"',
+                title: 'Search references for "' + (scope.variable.name ? scope.variable.name : scope.variable.evaluateName) + '"',
                 cancellable: true
             }, async (progress, token) => {
 

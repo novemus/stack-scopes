@@ -222,7 +222,7 @@ export class StackSnapshot {
                         references.push(new Reference(target.thread, target.frame, [...target.chain, { ...variable, pointer: ptr }]));
                     }
 
-                    if (depth > 0 && variable.variablesReference !== 0) {
+                    if (depth > 0 && ptr !== 0 && variable.variablesReference !== 0) {
                         const node = target.chain.find(n => n.pointer === ptr);
                         if (node === undefined) {
                             const places = await this.searchPointerReferences(pointer, depth - 1, progress, new Reference(target.thread, target.frame, [...target.chain, { ...variable, pointer: ptr }]));
