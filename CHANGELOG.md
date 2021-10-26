@@ -11,3 +11,7 @@
 ## 1.2.0 (October 15, 2021)
 
 - Evaluate elements of dynamically allocated arrays.
+
+## 1.2.1 (October 26, 2021)
+
+- Expand the contents of the variable on the stack graph.
