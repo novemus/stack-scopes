@@ -97,6 +97,39 @@ class Frame {
         line.appendChild(funcResizer);
         line.appendChild(objCell);
 
+        let startX = 0;
+        let startWidth = 0;
+        let cell = null;
+
+        const onMouseMove = event => {
+            cell.style.width = (startWidth + event.clientX - startX) + 'px';
+            event.stopPropagation();
+        };
+
+        const onMouseUp = event => {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            event.stopPropagation();
+        };
+
+        moduleResizer.addEventListener('mousedown', event => {
+            cell = moduleCell.parentElement.parentElement.firstChild.nextSibling.firstChild.nextSibling;
+            startX = event.clientX;
+            startWidth = parseInt(document.defaultView.getComputedStyle(cell).width, 10);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+            event.stopPropagation();
+        });
+
+        funcResizer.addEventListener('mousedown', event => {
+            cell = funcCell.parentElement.parentElement.firstChild.nextSibling.firstChild.nextSibling.nextSibling.nextSibling;
+            startX = event.clientX;
+            startWidth = parseInt(document.defaultView.getComputedStyle(cell).width, 10);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+            event.stopPropagation();
+        });
+
         return line;
     }
 
