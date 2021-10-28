@@ -72,11 +72,17 @@ class Frame {
         moduleCell.setAttribute('tag', this.module.tag);
         moduleCell.textContent = this.module.value;
 
+        const moduleResizer = document.createElement("td");
+        moduleResizer.setAttribute('tag', this.module.tag);
+
         const funcCell = document.createElement("td");
         funcCell.className = 'function';
         funcCell.setAttribute('title', this.func.label);
         funcCell.setAttribute('tag', this.func.tag);
         funcCell.textContent = this.func.value;
+
+        const funcResizer = document.createElement("td");
+        funcResizer.setAttribute('tag', this.func.tag);
 
         const objCell = document.createElement("td");
         objCell.className = 'object';
@@ -86,7 +92,9 @@ class Frame {
 
         line.appendChild(frameCell);
         line.appendChild(moduleCell);
+        line.appendChild(moduleResizer);
         line.appendChild(funcCell);
+        line.appendChild(funcResizer);
         line.appendChild(objCell);
 
         return line;
@@ -96,7 +104,7 @@ class Frame {
         const row = document.createElement('tr');
         const cell = document.createElement('td');
         cell.id = 'frame-scope-' + this.id;
-        cell.setAttribute('colspan', 4);
+        cell.setAttribute('colspan', 6);
         cell.style.display = 'none';
 
         row.appendChild(cell);
