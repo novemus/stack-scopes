@@ -15,3 +15,7 @@
 ## 1.2.1 (October 26, 2021)
 
 - Expand the contents of the variable on the stack graph.
+
+## 1.2.2 (October 29, 2021)
+
+- Ability to resize stack table columns.

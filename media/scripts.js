@@ -15,7 +15,9 @@ class Frame {
         line.className = 'line';
         line.addEventListener('click', event => {
             if(!event.ctrlKey) {
-                this.api.postMessage({ command: 'select', frame: this.id });
+                if (event.target.className !== 'resizer') {
+                    this.api.postMessage({ command: 'select', frame: this.id });
+                }
             } else {
                 const elements = document.querySelectorAll('[tag=' + event.target.getAttribute('tag') + ']');
                 if (event.target.style.backgroundColor === '') {
@@ -73,6 +75,7 @@ class Frame {
         moduleCell.textContent = this.module.value;
 
         const moduleResizer = document.createElement("td");
+        moduleResizer.className = 'resizer';
         moduleResizer.setAttribute('tag', this.module.tag);
 
         const funcCell = document.createElement("td");
@@ -82,6 +85,7 @@ class Frame {
         funcCell.textContent = this.func.value;
 
         const funcResizer = document.createElement("td");
+        funcResizer.className = 'resizer';
         funcResizer.setAttribute('tag', this.func.tag);
 
         const objCell = document.createElement("td");

@@ -7,7 +7,7 @@ html, body {
 .block {
     display: inline-block;
     vertical-align: bottom;
-    margin-top: 25px;
+    margin-top: 30px;
     margin-right: 20px;
 }
 .stack {
@@ -15,7 +15,7 @@ html, body {
     border: 1px solid var(--vscode-editorIndentGuide-background);
     background: var(--vscode-editor-background);
     table-layout: fixed;
-    width: 450px;
+    width: 50px;
 }
 
 table.stack td:nth-of-type(1) { width: 20px; }
@@ -26,7 +26,7 @@ table.stack td:nth-of-type(3) {
     cursor: col-resize;
     user-select: none;
 }
-table.stack td:nth-of-type(4) { width: 310px; border-right: none; }
+table.stack td:nth-of-type(4) { width: 290px; border-right: none; }
 table.stack td:nth-of-type(5) {
     width: 5px;
     border-left: none;
