@@ -241,9 +241,11 @@ export class SearchReference extends ReferenceDataItem {
         return undefined;
     }
     revealReferences() {
-        this.children?.then(children => {
-            children.forEach(child => child.revealReferences());
-        });
+        if (this.children) {
+            this.children?.then(children => {
+                children.forEach(child => child.revealReferences());
+            });
+        }
     }
     getParent() : vscode.ProviderResult<ReferenceDataItem> {
         return this.parent;
@@ -292,7 +294,7 @@ export class FrameReference extends ReferenceDataItem {
                             items.push(new VariableReference(variable, this));
                         }
                         this.chains.forEach(chain => {
-                            const child = items.find(item => chain[0].variablesReference === item.variable.variablesReference);
+                            const child = items.find(item => chain[0].evaluateName === item.variable.evaluateName);
                             if (child) {
                                 if (chain.length > 1) {
                                     child.pushChain(chain.slice(1));
@@ -322,9 +324,11 @@ export class FrameReference extends ReferenceDataItem {
         return utils.makeFrameTag(this.frame.id);
     }
     revealReferences() {
-        this.children?.then(children => {
-            children.forEach(child => child.revealReferences());
-        });
+        if (this.children) {
+            this.children?.then(children => {
+                children.forEach(child => child.revealReferences());
+            });
+        }
     }
     getParent() : vscode.ProviderResult<ReferenceDataItem> {
         return this.parent;
@@ -369,9 +373,11 @@ export class FoldReference extends ReferenceDataItem {
         return undefined;
     }
     revealReferences() {
-        this.children?.then(children => {
-            children.forEach(child => child.revealReferences());
-        });
+        if (this.children) {
+            this.children?.then(children => {
+                children.forEach(child => child.revealReferences());
+            });
+        }
     }
     getParent() : vscode.ProviderResult<ReferenceDataItem> {
         return this.parent;
@@ -415,7 +421,7 @@ export class VariableReference extends ReferenceDataItem {
                             items.push(new VariableReference(variable, this));
                         }
                         this.chains.forEach(chain => {
-                            const child = items.find(item => chain[0].variablesReference === item.variable.variablesReference);
+                            const child = items.find(item => chain[0].evaluateName === item.variable.evaluateName);
                             if (child) {
                                 if (chain.length > 1) {
                                     child.pushChain(chain.slice(1));
@@ -445,9 +451,11 @@ export class VariableReference extends ReferenceDataItem {
         return this.variable.name === 'this' ? utils.makeObjectTag(this.variable.value) : undefined;
     }
     async revealReferences() {
-        this.children?.then(children => {
-            children.forEach(child => child.revealReferences());
-        });
+        if (this.children) {
+            this.children?.then(children => {
+                children.forEach(child => child.revealReferences());
+            });
+        }
         if (this.iconPath) {
             vscode.commands.executeCommand('stackScopes.revealReferenceTreeItem', this.parent);
         }
