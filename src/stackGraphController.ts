@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as utils from './utils';
 import { StackSnapshotReviewer, StackSnapshot } from './debugSessionInterceptor';
 import { ScopeDataItem, VariableScope, FrameScope} from './stackScopesDataProvider';
-import { ReferenceDataItem, PlaceReference, FrameReference } from './referencesDataProvider';
+import { ReferenceDataItem, VariableReference, FrameReference } from './referencesDataProvider';
 
 class Section {
     public label: string | undefined = '';
@@ -36,35 +36,6 @@ export class StackGraphController implements StackSnapshotReviewer {
     private modes: Map<vscode.WebviewPanel, DrawMode> = new Map<vscode.WebviewPanel, DrawMode>();
     
     constructor(private readonly context: vscode.ExtensionContext) {
-        context.subscriptions.push(
-            vscode.commands.registerCommand('stackScopes.revealVariable', async (item: ReferenceDataItem | ScopeDataItem) => {
-                const snapshot = item.getSnapshot();
-                const panel = this.graphs.get(snapshot.id);
-                if (panel) {
-                    let chain = [];
-                    if (item instanceof ReferenceDataItem) {
-                        while (item instanceof PlaceReference) {
-                            chain.push(item.variable.variablesReference);
-                            item = item.parent as PlaceReference;
-                        }
-                        if (item instanceof FrameReference) {
-                            chain.push(item.frame.id);
-                        }
-                    } else if (item instanceof VariableScope) {
-                        while (item instanceof VariableScope) {
-                            chain.push(item.variable.variablesReference);
-                            item = item.parent as VariableScope;
-                        }
-                        if (item instanceof FrameScope) {
-                            chain.push(item.frame.id);
-                        }
-                    }
-                    if (chain.length > 0) {
-                        panel.webview.postMessage({ command: 'reveal-chain', chain: chain.reverse() });
-                    }
-                }
-            })
-        );
     }
 
     async onSnapshotRemoved(snapshot: StackSnapshot) {

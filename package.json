@@ -75,8 +75,8 @@
         "icon": "$(close-all)"
       },
       {
-        "command": "stackScopes.revealVariable",
-        "title": "Reveal Variable",
+        "command": "stackScopes.revealReferences",
+        "title": "Reveal References",
         "icon": "$(list-tree)"
       },
       {
@@ -117,7 +117,7 @@
           "when": "false"
         },
         {
-          "command": "stackScopes.revealVariable",
+          "command": "stackScopes.revealReferences",
           "when": "false"
         }
       ],
@@ -150,13 +150,13 @@
           "group": "inline"
         },
         {
-          "command": "stackScopes.removeReferenceBunch",
+          "command": "stackScopes.revealReferences",
           "when": "viewItem == 'reference.references'",
           "group": "inline"
         },
         {
-          "command": "stackScopes.revealVariable",
-          "when": "viewItem == 'scope.this' || viewItem == 'scope.variable' || viewItem == 'reference.this' || viewItem == 'reference.place'",
+          "command": "stackScopes.removeReferenceBunch",
+          "when": "viewItem == 'reference.references'",
           "group": "inline"
         }
       ],

@@ -41,7 +41,7 @@ export class StackScopesDataProvider implements vscode.TreeDataProvider<ScopeDat
     }
 
     getParent(element: ScopeDataItem) : vscode.ProviderResult<ScopeDataItem> {
-        if (element.contextValue === 'module' && this._sessions.size === 1) {
+        if (element.contextValue === 'scope.module' && this._sessions.size === 1) {
             return undefined;
         }
         return element.getParent();
@@ -263,16 +263,16 @@ export class VariableScope extends ScopeDataItem {
             this.variables = new Promise(async (resolve, reject) => {
                 try {
                     const items: ScopeDataItem[] = [];
-                    if (this.variable.type.match(/^.*\*\s*(const)?\s*$/)) {
-                        const expression = '*(' + this.variable.evaluateName + ')';
-                        const data = await this.getSnapshot().evaluateExpression(this.frame.id, expression);
-                        items.push(new VariableScope({ ...data, value: data.result, evaluateName: expression }, this.frame, this));
+                    const variables = await this.getSnapshot().getVariables(this.variable.variablesReference) || [];
+                    if (this.variable.type.match(/^.*\*\s*(const)?\s*$/) && variables.length === 1 && variables[0].memoryReference) {
+                        const variable = { ...variables[0] };
+                        variable.name = '';
+                        items.push(new VariableScope(variable, this.frame, this));
                         items.push(new EvaluateScope(this));
                     } else {
-                        const variables = await this.getSnapshot().getVariables(this.variable.variablesReference) || [];
                         for (const variable of variables) {
                             items.push(new VariableScope(variable, this.frame, this));
-                        }   
+                        }
                     }
                     resolve(items);
                 } catch (error) {
