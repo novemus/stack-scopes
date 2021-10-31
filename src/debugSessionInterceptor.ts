@@ -232,10 +232,10 @@ export class StackSnapshot {
             abort: progress.abort,
             report: (job: number) => {
                 total += job;
-                progress.report(Math.round(total));
+                progress.report(Math.round(Math.min(total, 100)));
             }
         };
-        return this.searchPointerReferences(pointer, depth, 100, prog, target ? target : { thread: null, frame: null, chain: [] }, new Set<number>());
+        return this.searchPointerReferences(pointer, depth, 100.0, prog, target ? target : { thread: null, frame: null, chain: [] }, new Set<number>());
     }
 }
 
