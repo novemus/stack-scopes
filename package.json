@@ -28,6 +28,16 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "Stack Scopes",
+      "properties": {
+        "stackScopes.searchResultLimit": {
+          "type": "number",
+          "default": 64,
+          "description": "Max number of references in the search result."
+        }
+      }
+    },
     "views": {
       "debug": [
         {

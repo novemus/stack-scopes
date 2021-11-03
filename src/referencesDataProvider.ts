@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as utils from './utils';
-import { Reference } from './debugSessionInterceptor';
+import { Reference, MAX_CHAIN_LENGTH } from './debugSessionInterceptor';
 import { StackSnapshot, StackSnapshotReviewer } from './debugSessionInterceptor';
 import { ScopeDataItem, VariableScope } from './stackScopesDataProvider';
 
@@ -102,14 +102,28 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
                 title: 'Search References',
                 cancellable: true
             }, async (progress, token) => {
+
+                const limit : number = vscode.workspace.getConfiguration('stackScopes').get('searchResultLimit') || 64;
+                let stage: number = 0;
+                let found: number = 0;
+
                 const references = await snapshot.searchReferences(parseInt(pointer), depth, {
-                    report: value => {
-                        progress.report({ increment: value, message: value + '%' });
-                    },
                     abort: () => {
-                        return token.isCancellationRequested;
+                        return token.isCancellationRequested || found >= limit; 
+                    },
+                    done: (part: number) => {
+                        stage = Math.round(Math.min(stage + part, 100));
+                        progress.report({ increment: stage, message: stage + '%' });
+                    },
+                    yield: (count: number) => {
+                        found += count;
                     }
                 });
+
+                if (found >= limit) {
+                    vscode.window.showInformationMessage(`Found ${found} references. Search result limit reached.`);
+                }
+
                 session.pushBunch(name, references);
 
                 this._onDidChangeTreeData.fire();
@@ -235,17 +249,22 @@ export class FrameReference extends ReferenceDataItem {
     getChildren() : vscode.ProviderResult<ReferenceDataItem[]> {
         return new Promise(async (resolve, reject) => {
             try {
-                let children = new Map<string, FoldReference>();
+                let folds = new Map<string, ReferenceDataItem>();
+                let variables: ReferenceDataItem[] = [];
                 this.chains.forEach(chain => {
-                    if (chain.length > 0) {
+                    if (chain.length === 1) {
+                        variables.push(new VariableReference(chain[0], this));
+                    }
+                    else if (chain.length > 1) {
                         const path = chain.slice(0, chain.length - 1).map(item => item.name).join('>');
-                        if (!children.has(path)) {
-                            children.set(path, new FoldReference(chain.slice(0, chain.length - 1), this));
+                        if (!folds.has(path)) {
+                            folds.set(path, new FoldReference(chain.slice(0, chain.length - 1), this));
                         }
-                        children.get(path)?.pushVariable(chain[chain.length - 1]);
+                        const fold = folds.get(path) as FoldReference;
+                        fold.pushVariable(chain[chain.length - 1]);
                     }
                 });
-                resolve(Array.from(children.values()));
+                resolve(variables.concat(Array.from(folds.values())));
             } catch (error) {
                 console.log(error);
                 reject(error);
@@ -270,14 +289,14 @@ export class FoldReference extends ReferenceDataItem {
         super(FoldReference.makeName(path), vscode.TreeItemCollapsibleState.Expanded);
         this.contextValue = 'reference.fold';
         this.tooltip = path.map(item => item.name).join(' > ');
-        if (path.length >= 16) {
+        if (path.length >= MAX_CHAIN_LENGTH) {
             this.tooltip += ' ...';
         }
     }
     private static makeName(path: any[]) {
         if (path.length === 1) {
             return path[0].name;
-        } else if (path.length >= 16) {
+        } else if (path.length >= MAX_CHAIN_LENGTH) {
             return path.slice(0, 4).map(item => item.name).join(' > ') + ' ...';
         } else if (path.length > 4) {
             return path.slice(0, 3).map(item => item.name).join(' > ') + ' ... ' + path[path.length - 1].name;
@@ -315,19 +334,22 @@ export class FoldReference extends ReferenceDataItem {
 
 export class VariableReference extends ReferenceDataItem {
     constructor(public readonly variable: any, public readonly parent: ReferenceDataItem) {
-        super(variable.name + ':', vscode.TreeItemCollapsibleState.Collapsed);
+        super(variable.name + ':', variable.variablesReference ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
         this.description = variable.value;
         this.contextValue = variable.name === 'this' ? 'reference.this' : 'reference.variable';
         this.tooltip = variable.value;
-        this.iconPath = new vscode.ThemeIcon('tag', new vscode.ThemeColor('debugIcon.breakpointCurrentStackframeForeground'));
+        if (parent instanceof FoldReference || parent instanceof FrameReference) {
+            this.iconPath = new vscode.ThemeIcon('tag', new vscode.ThemeColor('debugIcon.breakpointCurrentStackframeForeground'));
+        }
     }
     getChildren() : vscode.ProviderResult<ReferenceDataItem[]> {
         return new Promise(async (resolve, reject) => {
             try {
                 const items: ReferenceDataItem[] = [];
-                Object.keys(this.variable).forEach(key => {
-                    items.push(new PropertyReference(key, this.variable[key].toString(), this));
-                });
+                const variables = await this.getSnapshot().getVariables(this.variable.variablesReference) || [];
+                for (const variable of variables) {
+                    items.push(new VariableReference(variable, this));
+                }
                 resolve(items);
             } catch (error) {
                 console.log(error);
@@ -340,27 +362,6 @@ export class VariableReference extends ReferenceDataItem {
     }
     getTag() : string | undefined {
         return this.variable.name === 'this' ? utils.makeObjectTag(this.variable.value) : undefined;
-    }
-    getParent() : vscode.ProviderResult<ReferenceDataItem> {
-        return this.parent;
-    }
-}
-
-export class PropertyReference extends ReferenceDataItem {
-    constructor(public readonly name: string, public readonly value: string, public readonly parent: ReferenceDataItem) {
-        super(name + ':', vscode.TreeItemCollapsibleState.None);
-        this.description = value;
-        this.contextValue = 'reference.property';
-        this.tooltip = value;
-    }
-    getChildren() : vscode.ProviderResult<ReferenceDataItem[]> {
-        return undefined;
-    }
-    getSnapshot() : StackSnapshot {
-        return this.parent.getSnapshot();
-    }
-    getTag() : string | undefined {
-        return undefined;
     }
     getParent() : vscode.ProviderResult<ReferenceDataItem> {
         return this.parent;

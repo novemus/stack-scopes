@@ -1,4 +1,4 @@
-export function hash(value: string | undefined): number {
+function hash(value: string | undefined): number {
     let hash: number = 0;
  
     if (!value || value.length === 0) {
@@ -12,7 +12,7 @@ export function hash(value: string | undefined): number {
     return hash;
 }
 
-function toHexString(value: string): string {
+function toRawHexView(value: string): string {
     if (!value) {
         return '';
     }
@@ -25,21 +25,21 @@ function toHexString(value: string): string {
 }
 
 export function makeModuleTag(moduleId: any): string {
-    return 'module-' + toHexString(moduleId?.toString());
+    return 'module-' + toRawHexView(moduleId?.toString());
 }
 
 export function makeFrameTag(frameId: any): string {
-    return 'frame-' + toHexString(frameId?.toString());
+    return 'frame-' + toRawHexView(frameId?.toString());
 }
 
 export function makeFunctionTag(name?: string, path?: string): string {
-    return 'func-' + toHexString(hash(name).toString()) + toHexString(hash(path).toString());
+    return 'func-' + toRawHexView(hash(name).toString()) + toRawHexView(hash(path).toString());
 }
 
 export function makeObjectTag(value: any): string {
-    return 'obj-' + toHexString(value?.toString());
+    return 'obj-' + toRawHexView(value?.toString());
 }
 
 export function makeVoidTag(value: any): string {
-    return 'void-' + toHexString(value?.toString());
+    return 'void-' + toRawHexView(value?.toString());
 }

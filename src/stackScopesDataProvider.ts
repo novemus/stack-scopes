@@ -110,7 +110,7 @@ export class DebugSessionScope extends ScopeDataItem {
         this.iconPath = new vscode.ThemeIcon('callstack-view-session', new vscode.ThemeColor('debugIcon.stopForeground'));
     }
     pushFrame(thread: any, module: any, frame: any): FrameScope | undefined {
-        if (!this.modules.has(frame.moduleId)) {
+        if (!this.modules.has(frame.moduleId ? frame.moduleId : '')) {
             this.modules.set(frame.moduleId, new ModuleScope(module, this));
         }
         const f = this.modules.get(frame.moduleId)?.pushFrame(thread, frame);
@@ -166,7 +166,7 @@ export class ModuleScope extends ScopeDataItem {
         return this.parent;
     }
     getTag() : string | undefined {
-        return utils.makeModuleTag(this.module.id);
+        return utils.makeModuleTag(this.module ? this.module.id : 0);
     }
     getSnapshot() : StackSnapshot {
         return this.parent.getSnapshot();
@@ -247,7 +247,7 @@ export class FrameScope extends ScopeDataItem {
 }
 
 export class VariableScope extends ScopeDataItem {
-    private evaluate : number = 0;
+    private evaluate: number = 0;
     constructor(public readonly variable: any, public readonly frame: any, public readonly parent: ScopeDataItem) { 
         super(variable.name?.length > 0 ? variable.name + ':' : '', variable.variablesReference !== 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
         this.description = variable.value ? variable.value : variable.result;
@@ -263,13 +263,10 @@ export class VariableScope extends ScopeDataItem {
                     const variable = { ...variables[0] };
                     variable.name = '';
                     items.push(new VariableScope(variable, this.frame, this));
-                    if (this.evaluate > 0) {
-                        for(let i = 1; i <= this.evaluate; ++i) {
-                            const expression = '*((' + this.variable.evaluateName + ')+' + i + ')';
-                            const data = await this.getSnapshot().evaluateExpression(this.frame.id, expression);
-                            items.push(new VariableScope({ ...data, value: data.result, evaluateName: expression }, this.frame, this));
-                            
-                        }
+                    for(let i = 1; i <= this.evaluate; ++i) {
+                        const expression = '*((' + this.variable.evaluateName + ')+' + i + ')';
+                        const data = await this.getSnapshot().evaluateExpression(this.frame.id, expression);
+                        items.push(new VariableScope({ ...data, value: data.result, evaluateName: expression }, this.frame, this));
                     }
                     items.push(new EvaluateScope(this));
                 } else {

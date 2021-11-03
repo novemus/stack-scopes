@@ -1,8 +1,11 @@
 import * as vscode from 'vscode';
 
+export const MAX_CHAIN_LENGTH : number = 16;
+
 export interface Progress {
     abort(): boolean;
-    report(job: number): void;
+    done(portion: number): void;
+    yield(count: number): void;
 }
 
 export interface StackSnapshotReviewer {
@@ -205,8 +208,9 @@ export class StackSnapshot {
                         }
 
                         if (ptr === pointer) {
-                            let chain = target.chain.slice(0, 16);
+                            let chain = target.chain.slice(0, MAX_CHAIN_LENGTH);
                             references.push({ thread: target.thread, frame: target.frame, chain: [ ...chain, variable ] });
+                            control.yield(1);
                         }
                         else if (depth > 0 && ptr !== 0 && variable.variablesReference !== 0 && !verified.has(ptr)) {
                             verified.add(ptr);
@@ -219,20 +223,12 @@ export class StackSnapshot {
                 }
             }
         }
-        control.report(job);
+        control.done(job);
         return references;
     }
 
     searchReferences(pointer: number, depth: number, progress: Progress, target?: Reference): Promise<Reference[]> {
-        let total: number = 0;
-        const prog = {
-            abort: progress.abort,
-            report: (job: number) => {
-                total += job;
-                progress.report(Math.round(Math.min(total, 100)));
-            }
-        };
-        return this.searchPointerReferences(pointer, depth, 100.0, prog, target ? target : { thread: null, frame: null, chain: [] }, new Set<number>());
+        return this.searchPointerReferences(pointer, depth, 100.0, progress, target ? target : { thread: null, frame: null, chain: [] }, new Set<number>());
     }
 }
 
