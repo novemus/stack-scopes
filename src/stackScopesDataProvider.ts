@@ -11,8 +11,8 @@ export class StackScopesDataProvider implements vscode.TreeDataProvider<ScopeDat
     constructor(context: vscode.ExtensionContext) {
         context.subscriptions.push(vscode.commands.registerCommand('stackScopes.evaluateNextArrayElement', async (item: VariableScope) => {
             if (item) {
-                await item.evaluateNextElement();
-                this._onDidChangeTreeData.fire();
+                item.evaluateNextElement();
+                this._onDidChangeTreeData.fire(item);
             }
         }));
     }
@@ -205,7 +205,6 @@ export class FunctionScope extends ScopeDataItem {
 }
 
 export class FrameScope extends ScopeDataItem {
-    private variables: Promise<VariableScope[]> | undefined = undefined;
     constructor(public readonly thread: any, public readonly frame: any, public readonly parent: ScopeDataItem) {
         super('#' + frame.id, vscode.TreeItemCollapsibleState.Collapsed);
         this.description = 'Thread #' + thread.id;
@@ -222,22 +221,19 @@ export class FrameScope extends ScopeDataItem {
         }
     }
     getChildren(): vscode.ProviderResult<ScopeDataItem[]> {
-        if (!this.variables) {
-            this.variables = new Promise(async (resolve, reject) => {
-                try {
-                    const items: VariableScope[] = [];
-                    const variables = await this.getSnapshot().getFrameVariables(this.frame.id) || [];
-                    for (const variable of variables) {
-                        items.push(new VariableScope(variable, this.frame, this));
-                    }
-                    resolve(items);
-                } catch (error) {
-                    console.log(error);
-                    reject(error);
+        return new Promise(async (resolve, reject) => {
+            try {
+                const items: VariableScope[] = [];
+                const variables = await this.getSnapshot().getFrameVariables(this.frame.id) || [];
+                for (const variable of variables) {
+                    items.push(new VariableScope(variable, this.frame, this));
                 }
-            });
-        }
-        return this.variables;
+                resolve(items);
+            } catch (error) {
+                console.log(error);
+                reject(error);
+            }
+        });
     }
     getParent() : vscode.ProviderResult<ScopeDataItem> {
         return this.parent;
@@ -251,7 +247,7 @@ export class FrameScope extends ScopeDataItem {
 }
 
 export class VariableScope extends ScopeDataItem {
-    private variables: Promise<ScopeDataItem[]> | undefined = undefined;
+    private evaluate : number = 0;
     constructor(public readonly variable: any, public readonly frame: any, public readonly parent: ScopeDataItem) { 
         super(variable.name?.length > 0 ? variable.name + ':' : '', variable.variablesReference !== 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
         this.description = variable.value ? variable.value : variable.result;
@@ -259,29 +255,34 @@ export class VariableScope extends ScopeDataItem {
         this.tooltip = variable.type;
     }
     getChildren() : vscode.ProviderResult<ScopeDataItem[]> {
-        if (!this.variables) {
-            this.variables = new Promise(async (resolve, reject) => {
-                try {
-                    const items: ScopeDataItem[] = [];
-                    const variables = await this.getSnapshot().getVariables(this.variable.variablesReference) || [];
-                    if (this.variable.type.match(/^.*\*\s*(const)?\s*$/) && variables.length === 1 && variables[0].memoryReference) {
-                        const variable = { ...variables[0] };
-                        variable.name = '';
-                        items.push(new VariableScope(variable, this.frame, this));
-                        items.push(new EvaluateScope(this));
-                    } else {
-                        for (const variable of variables) {
-                            items.push(new VariableScope(variable, this.frame, this));
+        return new Promise(async (resolve, reject) => {
+            try {
+                const items: ScopeDataItem[] = [];
+                const variables = await this.getSnapshot().getVariables(this.variable.variablesReference) || [];
+                if (this.variable.type.match(/^.*\*\s*(const)?\s*$/) && variables.length === 1 && variables[0].memoryReference) {
+                    const variable = { ...variables[0] };
+                    variable.name = '';
+                    items.push(new VariableScope(variable, this.frame, this));
+                    if (this.evaluate > 0) {
+                        for(let i = 1; i <= this.evaluate; ++i) {
+                            const expression = '*((' + this.variable.evaluateName + ')+' + i + ')';
+                            const data = await this.getSnapshot().evaluateExpression(this.frame.id, expression);
+                            items.push(new VariableScope({ ...data, value: data.result, evaluateName: expression }, this.frame, this));
+                            
                         }
                     }
-                    resolve(items);
-                } catch (error) {
-                    console.log(error);
-                    reject(error);
+                    items.push(new EvaluateScope(this));
+                } else {
+                    for (const variable of variables) {
+                        items.push(new VariableScope(variable, this.frame, this));
+                    }
                 }
-            });
-        }
-        return this.variables;
+                resolve(items);
+            } catch (error) {
+                console.log(error);
+                reject(error);
+            }
+        });
     }
     getParent() : vscode.ProviderResult<ScopeDataItem> {
         return this.parent;
@@ -292,18 +293,8 @@ export class VariableScope extends ScopeDataItem {
     getSnapshot() : StackSnapshot {
         return this.parent.getSnapshot();
     }
-    async evaluateNextElement() {
-        if (this.variable.type.match(/^.*\*\s*(const)?\s*$/)) {
-            const variables = await this.variables;
-            if (variables) {
-                const more = variables.pop();
-                const expression = '*((' + this.variable.evaluateName + ')+' + (variables.length) + ')';
-                const data = await this.getSnapshot().evaluateExpression(this.frame.id, expression);
-                variables.push(new VariableScope({ ...data, value: data.result, evaluateName: expression }, this.frame, this));
-                variables.push(more as EvaluateScope);
-                this.variables = Promise.resolve(variables);
-            }
-        }
+    evaluateNextElement() {
+        this.evaluate = this.evaluate + 1;
     }
 }
 

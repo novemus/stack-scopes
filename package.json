@@ -150,11 +150,6 @@
           "group": "inline"
         },
         {
-          "command": "stackScopes.revealReferences",
-          "when": "viewItem == 'reference.references'",
-          "group": "inline"
-        },
-        {
           "command": "stackScopes.removeReferenceBunch",
           "when": "viewItem == 'reference.references'",
           "group": "inline"

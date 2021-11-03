@@ -25,30 +25,10 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
             })
         );
         context.subscriptions.push(
-            vscode.commands.registerCommand('stackScopes.revealReferences', (item: ReferenceDataItem) => {
-                if (item instanceof SearchReference) {
-                    this.revealReferences(item as SearchReference);
-                }
-            })
-        );
-        context.subscriptions.push(
             vscode.commands.registerCommand('stackScopes.clearReferenceTree', () => {
                 this.clear();
             })
         );
-        context.subscriptions.push(vscode.commands.registerCommand('stackScopes.unfoldReferenceItem', async (item: ReferenceDataItem) => {
-            if (item) {
-                const frame = item as FrameReference;
-                if (frame) {
-                    frame.unfold();
-                }
-                const variable = item as VariableReference;
-                if (variable) {
-                    variable.unfold();
-                }
-                this._onDidChangeTreeData.fire();
-            }
-        }));
     }
     onSnapshotRemoved(snapshot: StackSnapshot) {
         this._sessions.delete(snapshot.id);
@@ -85,9 +65,6 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
         }
 
         return Promise.resolve([...this._sessions.values()]);
-    }
-    async revealReferences(bunch: SearchReference) {
-        bunch.revealReferences();
     }
     async makeBunch(scope: VariableScope) {
         const snapshot = scope.getSnapshot();
@@ -171,7 +148,6 @@ export abstract class ReferenceDataItem extends vscode.TreeItem {
     abstract getChildren() : vscode.ProviderResult<ReferenceDataItem[]>;
     abstract getSnapshot() : StackSnapshot;
     abstract getTag() : string | undefined;
-    abstract revealReferences() : void;
 }
 
 export class DebugSessionReference extends ReferenceDataItem {
@@ -195,18 +171,12 @@ export class DebugSessionReference extends ReferenceDataItem {
     getTag() : string | undefined {
         return undefined;
     }
-    revealReferences() {
-        for(const bunch of this.bunches.values()) {
-            bunch.revealReferences();
-        }
-    }
     getParent() : vscode.ProviderResult<ReferenceDataItem> {
         return undefined;
     }
 }
 
 export class SearchReference extends ReferenceDataItem {
-    private children: Promise<ReferenceDataItem[]> | undefined = undefined;
     constructor(public readonly name: string, public readonly references: Reference[], public readonly parent: DebugSessionReference) {
         super(name, vscode.TreeItemCollapsibleState.Expanded);
         this.contextValue = 'reference.references';
@@ -214,24 +184,21 @@ export class SearchReference extends ReferenceDataItem {
         this.iconPath = new vscode.ThemeIcon('references', new vscode.ThemeColor('debugIcon.pauseForeground'));
     }
     getChildren() : vscode.ProviderResult<ReferenceDataItem[]> {
-        if (!this.children) {
-            this.children = new Promise(async (resolve, reject) => {
-                try {
-                    const map: Map<number, FrameReference> = new Map<number, FrameReference>();
-                    this.references.forEach(reference => {
-                        if (!map.has(reference.frame.id)) {
-                            map.set(reference.frame.id, new FrameReference(reference.frame, reference.thread, this));
-                        }
-                        map.get(reference.frame.id)?.pushChain(reference.chain);
-                    });
-                    resolve(Array.from(map.values()));
-                } catch (error) {
-                    console.log(error);
-                    reject(error);
-                }
-            });
-        }
-        return this.children;
+        return new Promise(async (resolve, reject) => {
+            try {
+                const map: Map<number, FrameReference> = new Map<number, FrameReference>();
+                this.references.forEach(reference => {
+                    if (!map.has(reference.frame.id)) {
+                        map.set(reference.frame.id, new FrameReference(reference.frame, reference.thread, this));
+                    }
+                    map.get(reference.frame.id)?.pushChain(reference.chain);
+                });
+                resolve(Array.from(map.values()));
+            } catch (error) {
+                console.log(error);
+                reject(error);
+            }
+        });
     }
     getSnapshot() : StackSnapshot {
         return this.parent.getSnapshot();
@@ -239,20 +206,13 @@ export class SearchReference extends ReferenceDataItem {
     getTag() : string | undefined {
         return undefined;
     }
-    revealReferences() {
-        this.children?.then(children => {
-            children.forEach(child => child.revealReferences());
-        });
-    }
     getParent() : vscode.ProviderResult<ReferenceDataItem> {
         return this.parent;
     }
 }
 
 export class FrameReference extends ReferenceDataItem {
-    private unfolded: boolean = true;
     private chains: any[][] = [];
-    private children: Promise<ReferenceDataItem[]> | undefined = undefined;
     constructor(public readonly frame: any, public readonly thread: any, public readonly parent: SearchReference) {
         super(frame.name, vscode.TreeItemCollapsibleState.Expanded);
         this.contextValue = 'reference.frame';
@@ -270,49 +230,27 @@ export class FrameReference extends ReferenceDataItem {
     pushChain(chain: any[]) {
         if (chain.length > 0) {
             this.chains.push(chain);
-            if (this.chains.find(c => c.length === 1) === undefined){
-                this.unfolded = false;
-            }
         }
-    }
-    unfold() {
-        this.unfolded = true;
-        this.children = undefined;
-        this.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
     }
     getChildren() : vscode.ProviderResult<ReferenceDataItem[]> {
-        if (!this.children) {
-            this.children = new Promise(async (resolve, reject) => {
-                try {
-                    if (this.unfolded) {
-                        const items: VariableReference[] = [];
-                        const variables = await this.getSnapshot().getFrameVariables(this.frame.id) || [];
-                        for (const variable of variables) {
-                            items.push(new VariableReference(variable, this));
+        return new Promise(async (resolve, reject) => {
+            try {
+                let children = new Map<string, FoldReference>();
+                this.chains.forEach(chain => {
+                    if (chain.length > 0) {
+                        const path = chain.slice(0, chain.length - 1).map(item => item.name).join('>');
+                        if (!children.has(path)) {
+                            children.set(path, new FoldReference(chain.slice(0, chain.length - 1), this));
                         }
-                        this.chains.forEach(chain => {
-                            const child = items.find(item => chain[0].evaluateName === item.variable.evaluateName);
-                            if (child) {
-                                if (chain.length > 1) {
-                                    child.pushChain(chain.slice(1));
-                                } else {
-                                    child.iconPath = new vscode.ThemeIcon('tag', new vscode.ThemeColor('debugIcon.breakpointCurrentStackframeForeground'));
-                                }
-                            }
-                        });
-                        resolve(items);
-                    } else {
-                        const items: ReferenceDataItem[] = [];
-                        items.push(new FoldReference(this.chains, this));
-                        resolve(items);
+                        children.get(path)?.pushVariable(chain[chain.length - 1]);
                     }
-                } catch (error) {
-                    console.log(error);
-                    reject(error);
-                }
-            });
-        }
-        return this.children;
+                });
+                resolve(Array.from(children.values()));
+            } catch (error) {
+                console.log(error);
+                reject(error);
+            }
+        });
     }
     getSnapshot() : StackSnapshot {
         return this.parent.getSnapshot();
@@ -320,46 +258,49 @@ export class FrameReference extends ReferenceDataItem {
     getTag() : string | undefined {
         return utils.makeFrameTag(this.frame.id);
     }
-    revealReferences() {
-        this.children?.then(children => {
-            children.forEach(child => child.revealReferences());
-        });
-    }
     getParent() : vscode.ProviderResult<ReferenceDataItem> {
         return this.parent;
     }
 }
 
 export class FoldReference extends ReferenceDataItem {
+    private variables: any[] = [];
     private children: Promise<ReferenceDataItem[]> | undefined = undefined;
-    constructor(public readonly chains: any[][], public readonly parent: ReferenceDataItem) {
-        super('', vscode.TreeItemCollapsibleState.Expanded);
+    constructor(public readonly path: any[], public readonly parent: ReferenceDataItem) {
+        super(FoldReference.makeName(path), vscode.TreeItemCollapsibleState.Expanded);
         this.contextValue = 'reference.fold';
-        this.iconPath = new vscode.ThemeIcon('more');
-        this.command = {
-            title: 'Unfold Reference Item',
-            command: 'stackScopes.unfoldReferenceItem',
-            arguments: [this.parent as ReferenceDataItem]
-        };
+        this.tooltip = path.map(item => item.name).join(' > ');
+        if (path.length >= 16) {
+            this.tooltip += ' ...';
+        }
+    }
+    private static makeName(path: any[]) {
+        if (path.length === 1) {
+            return path[0].name;
+        } else if (path.length >= 16) {
+            return path.slice(0, 4).map(item => item.name).join(' > ') + ' ...';
+        } else if (path.length > 4) {
+            return path.slice(0, 3).map(item => item.name).join(' > ') + ' ... ' + path[path.length - 1].name;
+        }
+        return path.map(item => item.name).join(' > ');
+    }
+    pushVariable(variable: any) {
+        this.variables.push(variable);
     }
     getChildren() : vscode.ProviderResult<ReferenceDataItem[]> {
-        if (!this.children) {
-            this.children = new Promise(async (resolve, reject) => {
-                try {
-                    const items: ReferenceDataItem[] = [];
-                    this.chains.forEach(chain => {
-                        const child = new VariableReference(chain[chain.length - 1], this);
-                        child.iconPath = new vscode.ThemeIcon('tag', new vscode.ThemeColor('debugIcon.breakpointCurrentStackframeForeground'));
-                        items.push(child);
-                    });
-                    resolve(items);
-                } catch (error) {
-                    console.log(error);
-                    reject(error);
-                }
-            });
-        }
-        return this.children;
+        return new Promise(async (resolve, reject) => {
+            try {
+                const items: ReferenceDataItem[] = [];
+                this.variables.forEach(variable => {
+                    const child = new VariableReference(variable, this);
+                    items.push(child);
+                });
+                resolve(items);
+            } catch (error) {
+                console.log(error);
+                reject(error);
+            }
+        });
     }
     getSnapshot() : StackSnapshot {
         return this.parent.getSnapshot();
@@ -367,75 +308,32 @@ export class FoldReference extends ReferenceDataItem {
     getTag() : string | undefined {
         return undefined;
     }
-    revealReferences() {
-        this.children?.then(children => {
-            children.forEach(child => child.revealReferences());
-        });
-    }
     getParent() : vscode.ProviderResult<ReferenceDataItem> {
         return this.parent;
     }
 }
 
 export class VariableReference extends ReferenceDataItem {
-    private unfolded: boolean = true;
-    private chains: any[][] = [];
-    private children: Promise<ReferenceDataItem[]> | undefined = undefined;
     constructor(public readonly variable: any, public readonly parent: ReferenceDataItem) {
-        super(variable.name + ':', variable.variablesReference ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
+        super(variable.name + ':', vscode.TreeItemCollapsibleState.Collapsed);
         this.description = variable.value;
         this.contextValue = variable.name === 'this' ? 'reference.this' : 'reference.variable';
-        this.tooltip = variable.type;
-    }
-    pushChain(chain: any[]) {
-        if (chain.length > 0) {
-            this.chains.push(chain);
-            if (this.chains.find(c => c.length === 1) === undefined) {
-                this.unfolded = false;
-            }
-            this.collapsibleState = this.variable.variablesReference
-                ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None;
-        }
-    }
-    unfold() {
-        this.unfolded = true;
-        this.children = undefined;
-        this.collapsibleState = this.variable.variablesReference
-            ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None;
+        this.tooltip = variable.value;
+        this.iconPath = new vscode.ThemeIcon('tag', new vscode.ThemeColor('debugIcon.breakpointCurrentStackframeForeground'));
     }
     getChildren() : vscode.ProviderResult<ReferenceDataItem[]> {
-        if (!this.children) {
-            this.children = new Promise(async (resolve, reject) => {
-                try {
-                    if (this.unfolded) {
-                        const items: VariableReference[] = [];
-                        const variables = await this.getSnapshot().getVariables(this.variable.variablesReference) || [];
-                        for (const variable of variables) {
-                            items.push(new VariableReference(variable, this));
-                        }
-                        this.chains.forEach(chain => {
-                            const child = items.find(item => chain[0].evaluateName === item.variable.evaluateName);
-                            if (child) {
-                                if (chain.length > 1) {
-                                    child.pushChain(chain.slice(1));
-                                } else {
-                                    child.iconPath = new vscode.ThemeIcon('tag', new vscode.ThemeColor('debugIcon.breakpointCurrentStackframeForeground'));
-                                }
-                            }
-                        });
-                        resolve(items);
-                    } else {
-                        const items: ReferenceDataItem[] = [];
-                        items.push(new FoldReference(this.chains, this));
-                        resolve(items);
-                    }
-                } catch (error) {
-                    console.log(error);
-                    reject(error);
-                }
-            });
-        }
-        return this.children;
+        return new Promise(async (resolve, reject) => {
+            try {
+                const items: ReferenceDataItem[] = [];
+                Object.keys(this.variable).forEach(key => {
+                    items.push(new PropertyReference(key, this.variable[key].toString(), this));
+                });
+                resolve(items);
+            } catch (error) {
+                console.log(error);
+                reject(error);
+            }
+        });
     }
     getSnapshot() : StackSnapshot {
         return this.parent.getSnapshot();
@@ -443,13 +341,26 @@ export class VariableReference extends ReferenceDataItem {
     getTag() : string | undefined {
         return this.variable.name === 'this' ? utils.makeObjectTag(this.variable.value) : undefined;
     }
-    async revealReferences() {
-        this.children?.then(children => {
-            children.forEach(child => child.revealReferences());
-        });
-        if (this.iconPath) {
-            vscode.commands.executeCommand('stackScopes.revealReferenceTreeItem', this.parent);
-        }
+    getParent() : vscode.ProviderResult<ReferenceDataItem> {
+        return this.parent;
+    }
+}
+
+export class PropertyReference extends ReferenceDataItem {
+    constructor(public readonly name: string, public readonly value: string, public readonly parent: ReferenceDataItem) {
+        super(name + ':', vscode.TreeItemCollapsibleState.None);
+        this.description = value;
+        this.contextValue = 'reference.property';
+        this.tooltip = value;
+    }
+    getChildren() : vscode.ProviderResult<ReferenceDataItem[]> {
+        return undefined;
+    }
+    getSnapshot() : StackSnapshot {
+        return this.parent.getSnapshot();
+    }
+    getTag() : string | undefined {
+        return undefined;
     }
     getParent() : vscode.ProviderResult<ReferenceDataItem> {
         return this.parent;

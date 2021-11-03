@@ -23,7 +23,6 @@ export class StackSnapshot {
     private _modules: Promise<readonly any[] | undefined> | undefined = undefined;
     private _frames: Map<number, Promise<readonly any[] | undefined>> = new Map<number, Promise<readonly any[] | undefined>>();
     private _scopes: Map<number, Promise<readonly any[] | undefined>> = new Map<number, Promise<readonly any[] | undefined>>();
-    private _variables: Map<number, Promise<readonly any[] | undefined>> = new Map<number, Promise<readonly any[] | undefined>>();
 
     constructor(private readonly session: vscode.DebugSession, public readonly topThread: number) {
         this.id = session.id;
@@ -103,24 +102,21 @@ export class StackSnapshot {
     }
 
     async getVariables(reference: number): Promise<readonly any[] | undefined> {
-        if (!this._variables.has(reference)) {
-            this._variables.set(reference, new Promise(async (resolve, reject) => {
-                try {
-                    const { variables } = await this.session.customRequest('variables', {
-                        variablesReference: reference,
-                        filter: undefined,
-                        start: 0,
-                        count: undefined,
-                        format: { hex: false }
-                    });
-                    resolve(variables);
-                } catch (error) {
-                    console.log(error);
-                    reject(error);
-                }
-            }));
-        }
-        return this._variables.get(reference);
+        return new Promise(async (resolve, reject) => {
+            try {
+                const { variables } = await this.session.customRequest('variables', {
+                    variablesReference: reference,
+                    filter: undefined,
+                    start: 0,
+                    count: undefined,
+                    format: { hex: false }
+                });
+                resolve(variables);
+            } catch (error) {
+                console.log(error);
+                reject(error);
+            }
+        });
     }
 
     async getVariableValue(frame: number, name: string): Promise<string | undefined> {
@@ -209,7 +205,8 @@ export class StackSnapshot {
                         }
 
                         if (ptr === pointer) {
-                            references.push({ thread: target.thread, frame: target.frame, chain: [ ...target.chain, variable ] });
+                            let chain = target.chain.slice(0, 16);
+                            references.push({ thread: target.thread, frame: target.frame, chain: [ ...chain, variable ] });
                         }
                         else if (depth > 0 && ptr !== 0 && variable.variablesReference !== 0 && !verified.has(ptr)) {
                             verified.add(ptr);
