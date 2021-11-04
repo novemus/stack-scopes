@@ -35,6 +35,16 @@
           "type": "number",
           "default": 64,
           "description": "Max number of references in the search result."
+        },
+        "stackScopes.shortRferencePath": {
+          "type": "number",
+          "default": 4,
+          "description": "Max number of items in the short reference path."
+        },
+        "stackScopes.longReferencePath": {
+          "type": "number",
+          "default": 32,
+          "description": "Max number of items in the long reference path."
         }
       }
     },

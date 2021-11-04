@@ -1,6 +1,19 @@
 import * as vscode from 'vscode';
 
-export const MAX_CHAIN_LENGTH : number = 16;
+export function longReferencePath(): number {
+    const value : number | undefined = vscode.workspace.getConfiguration('stackScopes').get('longReferencePath');
+    return value && value > 0 ? value : 16;
+}
+
+export function shortRferencePath(): number {
+    const value : number | undefined = vscode.workspace.getConfiguration('stackScopes').get('shortRferencePath');
+    return value && value > 0 ? value : 4;
+}
+
+export function searchResultLimit(): number {
+    const value : number | undefined = vscode.workspace.getConfiguration('stackScopes').get('searchResultLimit');
+    return value && value > 0 ? value : 64;
+}
 
 export interface Progress {
     abort(): boolean;
@@ -162,73 +175,76 @@ export class StackSnapshot {
         });
     }
 
-    private async searchPointerReferences(pointer: number, depth: number, job: number, control: Progress, target: Reference, verified: Set<number>): Promise<Reference[]> {
-        let references: Reference[] = [];
-        if (!control.abort()) {
-            if (!target?.thread) {
-                const threads = await this.threads() || [];
-                for(const thread of threads) {
-                    if (control.abort()) {
-                        break;
-                    }
-                    const places = await this.searchPointerReferences(pointer, depth, job / threads.length, control, { thread: thread, frame: target?.frame, chain: target?.chain }, verified);
-                    if (places.length > 0) {
-                        references = [...references, ...places];
-                    }
-                }
-            } else if (!target.frame) {
-                const frames = await this.frames(target.thread.id) || [];
-                for(const frame of frames) {
-                    if (control.abort()) {
-                        break;
-                    }
-                    const places = await this.searchPointerReferences(pointer, depth - 1, job / frames.length, control, { thread: target.thread, frame: frame, chain: target?.chain }, verified);
-                    if (places.length > 0) {
-                        references = [...references, ...places];
-                    }
-                }
-            } else {
-                const variables = !target.chain || target.chain.length === 0 ? await this.getFrameVariables(target.frame.id) : await this.getVariables(target.chain[target.chain.length - 1].variablesReference);
-                if (variables) {
-                    for(const variable of variables) {
+    searchReferences(pointer: number, depth: number, progress: Progress, target?: Reference): Promise<Reference[]> {
+        const snapshot = this;
+        const chainLimit = longReferencePath();
+
+        const search = async (pointer: number, depth: number, job: number, control: Progress, target: Reference, verified: Set<number>): Promise<Reference[]> => {
+            let references: Reference[] = [];
+            if (!control.abort()) {
+                if (!target?.thread) {
+                    const threads = await snapshot.threads() || [];
+                    for(const thread of threads) {
                         if (control.abort()) {
                             break;
                         }
-
-                        let ptr = 0;
-                        if (variable.memoryReference !== undefined && parseInt(variable.variablesReference) !== 0) {
-                            ptr = parseInt(variable.memoryReference);
-                        } else if (variable.memoryReference !== undefined && variable.value?.match(/^(0x[0-9A-Fa-f]+).*$/)) {
-                            if (parseInt(variable.memoryReference) === parseInt(variable.value.match(/^(0x[0-9A-Fa-f]+).*$/)[1])) {
-                                ptr = parseInt(variable.memoryReference);
+                        const places = await search(pointer, depth, job / threads.length, control, { thread: thread, frame: target?.frame, chain: target?.chain }, verified);
+                        if (places.length > 0) {
+                            references = [...references, ...places];
+                        }
+                    }
+                } else if (!target.frame) {
+                    const frames = await snapshot.frames(target.thread.id) || [];
+                    for(const frame of frames) {
+                        if (control.abort()) {
+                            break;
+                        }
+                        const places = await search(pointer, depth - 1, job / frames.length, control, { thread: target.thread, frame: frame, chain: target?.chain }, verified);
+                        if (places.length > 0) {
+                            references = [...references, ...places];
+                        }
+                    }
+                } else {
+                    const variables = !target.chain || target.chain.length === 0 ? await snapshot.getFrameVariables(target.frame.id) : await this.getVariables(target.chain[target.chain.length - 1].variablesReference);
+                    if (variables) {
+                        for(const variable of variables) {
+                            if (control.abort()) {
+                                break;
                             }
-                        } else {
-                            const { memoryReference } = await this.evaluateExpression(target.frame.id, '(void*)&(' + variable.evaluateName + ')');
-                            ptr = parseInt(memoryReference);
-                        }
-
-                        if (ptr === pointer) {
-                            let chain = target.chain.slice(0, MAX_CHAIN_LENGTH);
-                            references.push({ thread: target.thread, frame: target.frame, chain: [ ...chain, variable ] });
-                            control.yield(1);
-                        }
-                        else if (depth > 0 && ptr !== 0 && variable.variablesReference !== 0 && !verified.has(ptr)) {
-                            verified.add(ptr);
-                            const places = await this.searchPointerReferences(pointer, depth - 1, job / variables.length, control, { thread: target.thread, frame: target.frame, chain: [ ...target.chain, variable ] }, verified);
-                            if (places.length > 0) {
-                                references = [...references, ...places];
+    
+                            let ptr = 0;
+                            if (variable.memoryReference !== undefined && parseInt(variable.variablesReference) !== 0) {
+                                ptr = parseInt(variable.memoryReference);
+                            } else if (variable.memoryReference !== undefined && variable.value?.match(/^(0x[0-9A-Fa-f]+).*$/)) {
+                                if (parseInt(variable.memoryReference) === parseInt(variable.value.match(/^(0x[0-9A-Fa-f]+).*$/)[1])) {
+                                    ptr = parseInt(variable.memoryReference);
+                                }
+                            } else {
+                                const { memoryReference } = await snapshot.evaluateExpression(target.frame.id, '(void*)&(' + variable.evaluateName + ')');
+                                ptr = parseInt(memoryReference);
+                            }
+    
+                            if (ptr === pointer) {
+                                let chain = target.chain.slice(0, chainLimit);
+                                references.push({ thread: target.thread, frame: target.frame, chain: [ ...chain, variable ] });
+                                control.yield(1);
+                            }
+                            else if (depth > 0 && ptr !== 0 && variable.variablesReference !== 0 && !verified.has(ptr)) {
+                                verified.add(ptr);
+                                const places = await search(pointer, depth - 1, job / variables.length, control, { thread: target.thread, frame: target.frame, chain: [ ...target.chain, variable ] }, verified);
+                                if (places.length > 0) {
+                                    references = [...references, ...places];
+                                }
                             }
                         }
                     }
                 }
             }
-        }
-        control.done(job);
-        return references;
-    }
+            control.done(job);
+            return references;
+        };
 
-    searchReferences(pointer: number, depth: number, progress: Progress, target?: Reference): Promise<Reference[]> {
-        return this.searchPointerReferences(pointer, depth, 100.0, progress, target ? target : { thread: null, frame: null, chain: [] }, new Set<number>());
+        return search(pointer, depth, 100.0, progress, target ? target : { thread: null, frame: null, chain: [] }, new Set<number>());
     }
 }
 

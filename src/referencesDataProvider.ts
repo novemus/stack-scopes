@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as utils from './utils';
-import { Reference, MAX_CHAIN_LENGTH } from './debugSessionInterceptor';
+import { Reference, longReferencePath, shortRferencePath, searchResultLimit } from './debugSessionInterceptor';
 import { StackSnapshot, StackSnapshotReviewer } from './debugSessionInterceptor';
 import { ScopeDataItem, VariableScope } from './stackScopesDataProvider';
 
@@ -103,7 +103,7 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
                 cancellable: true
             }, async (progress, token) => {
 
-                const limit : number = vscode.workspace.getConfiguration('stackScopes').get('searchResultLimit') || 64;
+                const limit: number = searchResultLimit();
                 let stage: number = 0;
                 let found: number = 0;
 
@@ -121,7 +121,7 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
                 });
 
                 if (found >= limit) {
-                    vscode.window.showInformationMessage(`Found ${found} references. Search result limit reached.`);
+                    vscode.window.showInformationMessage(`Found ${found} references. The limit of search results has been reached. You can change the limit in the extension settings, but do it with caution, as this will consume additional memory.`);
                 }
 
                 session.pushBunch(name, references);
@@ -284,24 +284,28 @@ export class FrameReference extends ReferenceDataItem {
 
 export class FoldReference extends ReferenceDataItem {
     private variables: any[] = [];
-    private children: Promise<ReferenceDataItem[]> | undefined = undefined;
-    constructor(public readonly path: any[], public readonly parent: ReferenceDataItem) {
-        super(FoldReference.makeName(path), vscode.TreeItemCollapsibleState.Expanded);
+    constructor(public readonly chain: any[], public readonly parent: ReferenceDataItem) {
+        super(FoldReference.makeShortPath(chain), vscode.TreeItemCollapsibleState.Expanded);
         this.contextValue = 'reference.fold';
-        this.tooltip = path.map(item => item.name).join(' > ');
-        if (path.length >= MAX_CHAIN_LENGTH) {
-            this.tooltip += ' ...';
-        }
+        this.tooltip = FoldReference.makeLongPath(chain);
     }
-    private static makeName(path: any[]) {
-        if (path.length === 1) {
-            return path[0].name;
-        } else if (path.length >= MAX_CHAIN_LENGTH) {
-            return path.slice(0, 4).map(item => item.name).join(' > ') + ' ...';
-        } else if (path.length > 4) {
-            return path.slice(0, 3).map(item => item.name).join(' > ') + ' ... ' + path[path.length - 1].name;
+    private static makeShortPath(chain: any[]): string {
+        const shortPathLen = shortRferencePath();
+        const longPathLen = longReferencePath();
+        if (chain.length >= longPathLen) {
+            return chain.slice(0, shortPathLen).map(item => item.name).join(' > ') + ' ...';
+        } else if (chain.length === 1) {
+            return chain[0].name;
+        } else if (chain.length > shortPathLen) {
+            return chain.slice(0, shortPathLen - 1).map(item => item.name).join(' > ') + ' ... ' + chain[chain.length - 1].name;
         }
-        return path.map(item => item.name).join(' > ');
+        return chain.map(item => item.name).join(' > ');
+    }
+    private static makeLongPath(chain: any[]): string {
+        if (chain.length >= longReferencePath()) {
+            return chain.map(item => item.name).join(' > ') + ' ...';
+        }
+        return chain.map(item => item.name).join(' > ');
     }
     pushVariable(variable: any) {
         this.variables.push(variable);
@@ -337,7 +341,7 @@ export class VariableReference extends ReferenceDataItem {
         super(variable.name + ':', variable.variablesReference ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
         this.description = variable.value;
         this.contextValue = variable.name === 'this' ? 'reference.this' : 'reference.variable';
-        this.tooltip = variable.value;
+        this.tooltip = variable.type;
         if (parent instanceof FoldReference || parent instanceof FrameReference) {
             this.iconPath = new vscode.ThemeIcon('tag', new vscode.ThemeColor('debugIcon.breakpointCurrentStackframeForeground'));
         }
