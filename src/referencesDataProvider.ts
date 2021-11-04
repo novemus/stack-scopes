@@ -13,7 +13,7 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
         context.subscriptions.push(
             vscode.commands.registerCommand('stackScopes.searchReferences', (item: ScopeDataItem) => {
                 if (item instanceof VariableScope) {
-                    this.makeBunch(item as VariableScope);
+                    this.makeBunchForVariable(item as VariableScope);
                 }
             })
         );
@@ -65,14 +65,16 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
 
         return Promise.resolve([...this._sessions.values()]);
     }
-    async makeBunch(scope: VariableScope) {
+    async makeBunchForVariable(scope: VariableScope) {
         const snapshot = scope.getSnapshot();
         const session = this._sessions.get(snapshot.id);
         if (session) {
             const input = await vscode.window.showInputBox({
-                placeHolder: 'Specify the search depth. By default, only in the frame scopes.',
+                placeHolder: 'Specify the search depth. 1 - search only in frame scopes.',
                 validateInput: text => {
-                    if (text.length > 0) {
+                    if (text.length === 0) {
+                        return 'type a number more than 0';
+                    } else if (text.length > 0) {
                         const depth = parseInt(text);
                         if (isNaN(depth) || depth <= 0) {
                             return 'type a number more than 0';
@@ -82,7 +84,11 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
                 }
             });
 
-            const depth = input && input.length > 0 ? parseInt(input) : 1;
+            const depth = parseInt(input as string);
+            if (isNaN(depth)) {
+                return;
+            }
+
             let pointer = '';
             if (scope.variable.memoryReference !== undefined && parseInt(scope.variable.variablesReference) !== 0) {
                 pointer = scope.variable.memoryReference;
@@ -123,21 +129,22 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
                     vscode.window.showInformationMessage(`Found ${found} references. The limit of search results has been reached. You can change the limit in the extension settings, but do it with caution, as this will consume additional memory.`);
                 }
 
-                session.pushBunch(name, references);
+                session.addBunch(name, references);
                 this._onDidChangeTreeData.fire();
             });
         }
     }
     removeBunch(bunch: SearchReference) {
         const snapshot = bunch.getSnapshot();
-        if (snapshot && this._sessions.has(snapshot.id)) {
-            this._sessions.get(snapshot.id)?.bunches.delete(bunch.name);
+        const session = this._sessions.get(snapshot.id);
+        if (session) {
+            session.deleteBunch(bunch.name);
             this._onDidChangeTreeData.fire();
         }
     }
     clear() {
         for (const session of this._sessions.values()) {
-            session.bunches.clear();
+            session.children.clear();
         }
         this._onDidChangeTreeData.fire();
     }
@@ -151,7 +158,7 @@ export abstract class ReferenceDataItem extends vscode.TreeItem {
 }
 
 export class DebugSessionReference extends ReferenceDataItem {
-    public readonly bunches: Map<string, SearchReference> = new Map<string, SearchReference>();
+    public readonly children: Map<string, SearchReference> = new Map<string, SearchReference>();
     constructor(public readonly snapshot: StackSnapshot) {
         super(snapshot.name, vscode.TreeItemCollapsibleState.Expanded);
         this.contextValue = 'reference.session';
@@ -159,11 +166,14 @@ export class DebugSessionReference extends ReferenceDataItem {
         this.tooltip = snapshot.name;
         this.iconPath = new vscode.ThemeIcon('callstack-view-session', new vscode.ThemeColor('debugIcon.stopForeground'));
     }
-    pushBunch(name: string, references: Reference[]) {
-        this.bunches.set(name, new SearchReference(name, references, this));
+    addBunch(name: string, references: Reference[]) {
+        this.children.set(name, new SearchReference(name, references, this));
+    }
+    deleteBunch(name: string) {
+        this.children.delete(name);
     }
     getChildren() : vscode.ProviderResult<ReferenceDataItem[]> {
-        return Promise.resolve(Array.from(this.bunches.values()));
+        return Promise.resolve(Array.from(this.children.values()));
     }
     getSnapshot() : StackSnapshot {
         return this.snapshot;
@@ -177,6 +187,7 @@ export class DebugSessionReference extends ReferenceDataItem {
 }
 
 export class SearchReference extends ReferenceDataItem {
+    private children: vscode.ProviderResult<ReferenceDataItem[]>;
     constructor(public readonly name: string, public readonly references: Reference[], public readonly parent: DebugSessionReference) {
         super(name, vscode.TreeItemCollapsibleState.Expanded);
         this.contextValue = 'reference.references';
@@ -187,21 +198,24 @@ export class SearchReference extends ReferenceDataItem {
         FoldReference.shortPathLength = shortReferencePath();
     }
     getChildren() : vscode.ProviderResult<ReferenceDataItem[]> {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const map: Map<number, FrameReference> = new Map<number, FrameReference>();
-                this.references.forEach(reference => {
-                    if (!map.has(reference.frame.id)) {
-                        map.set(reference.frame.id, new FrameReference(reference.frame, reference.thread, this));
-                    }
-                    map.get(reference.frame.id)?.pushReference(reference);
-                });
-                resolve(Array.from(map.values()));
-            } catch (error) {
-                console.log(error);
-                reject(error);
-            }
-        });
+        if (!this.children) {
+            this.children = new Promise(async (resolve, reject) => {
+                try {
+                    const map: Map<number, FrameReference> = new Map<number, FrameReference>();
+                    this.references.forEach(reference => {
+                        if (!map.has(reference.frame.id)) {
+                            map.set(reference.frame.id, new FrameReference(reference.frame, reference.thread, this));
+                        }
+                        map.get(reference.frame.id)?.pushReference(reference);
+                    });
+                    resolve(Array.from(map.values()));
+                } catch (error) {
+                    console.log(error);
+                    reject(error);
+                }
+            });
+        }
+        return this.children;
     }
     getSnapshot() : StackSnapshot {
         return this.parent.getSnapshot();
@@ -216,6 +230,7 @@ export class SearchReference extends ReferenceDataItem {
 
 export class FrameReference extends ReferenceDataItem {
     private references: Reference[] = [];
+    private children: vscode.ProviderResult<ReferenceDataItem[]>;
     constructor(public readonly frame: any, public readonly thread: any, public readonly parent: SearchReference) {
         super(frame.name, vscode.TreeItemCollapsibleState.Expanded);
         this.contextValue = 'reference.frame';
@@ -234,28 +249,31 @@ export class FrameReference extends ReferenceDataItem {
         this.references.push(reference);
     }
     getChildren() : vscode.ProviderResult<ReferenceDataItem[]> {
-        return new Promise(async (resolve, reject) => {
-            try {
-                let folds = new Map<string, ReferenceDataItem>();
-                let variables: ReferenceDataItem[] = [];
-                this.references.forEach(reference => {
-                    if (reference.path?.length === 0 && reference.variable) {
-                        variables.push(new VariableReference(reference.variable, this));
-                    } else if (reference.path && reference.path?.length > 0) {
-                        const path = reference.path.join('>');
-                        if (!folds.has(path)) {
-                            folds.set(path, new FoldReference(reference.path, this));
+        if (!this.children) {
+            this.children = new Promise(async (resolve, reject) => {
+                try {
+                    let folds = new Map<string, ReferenceDataItem>();
+                    let variables: ReferenceDataItem[] = [];
+                    this.references.forEach(reference => {
+                        if (reference.path?.length === 0 && reference.variable) {
+                            variables.push(new VariableReference(reference.variable, this));
+                        } else if (reference.path && reference.path?.length > 0) {
+                            const path = reference.path.join('>');
+                            if (!folds.has(path)) {
+                                folds.set(path, new FoldReference(reference.path, this));
+                            }
+                            const fold = folds.get(path) as FoldReference;
+                            fold.pushVariable(reference.variable);
                         }
-                        const fold = folds.get(path) as FoldReference;
-                        fold.pushVariable(reference.variable);
-                    }
-                });
-                resolve(variables.concat(Array.from(folds.values())));
-            } catch (error) {
-                console.log(error);
-                reject(error);
-            }
-        });
+                    });
+                    resolve(variables.concat(Array.from(folds.values())));
+                } catch (error) {
+                    console.log(error);
+                    reject(error);
+                }
+            });
+        }
+        return this.children;
     }
     getSnapshot() : StackSnapshot {
         return this.parent.getSnapshot();
@@ -272,6 +290,7 @@ export class FoldReference extends ReferenceDataItem {
     public static longPathLength: number = longReferencePath();
     public static shortPathLength: number = shortReferencePath();
     private variables: any[] = [];
+    private children: vscode.ProviderResult<ReferenceDataItem[]>;
     constructor(public readonly path: string[], public readonly parent: ReferenceDataItem) {
         super(FoldReference.makeShortPathLabel(path), vscode.TreeItemCollapsibleState.Expanded);
         this.contextValue = 'reference.fold';
@@ -297,19 +316,22 @@ export class FoldReference extends ReferenceDataItem {
         this.variables.push(variable);
     }
     getChildren() : vscode.ProviderResult<ReferenceDataItem[]> {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const items: ReferenceDataItem[] = [];
-                this.variables.forEach(variable => {
-                    const child = new VariableReference(variable, this);
-                    items.push(child);
-                });
-                resolve(items);
-            } catch (error) {
-                console.log(error);
-                reject(error);
-            }
-        });
+        if (!this.children) {
+            this.children = new Promise(async (resolve, reject) => {
+                try {
+                    const items: ReferenceDataItem[] = [];
+                    this.variables.forEach(variable => {
+                        const child = new VariableReference(variable, this);
+                        items.push(child);
+                    });
+                    resolve(items);
+                } catch (error) {
+                    console.log(error);
+                    reject(error);
+                }
+            });
+        }
+        return this.children;
     }
     getSnapshot() : StackSnapshot {
         return this.parent.getSnapshot();
@@ -323,6 +345,7 @@ export class FoldReference extends ReferenceDataItem {
 }
 
 export class VariableReference extends ReferenceDataItem {
+    private children: vscode.ProviderResult<ReferenceDataItem[]>;
     constructor(public readonly variable: any, public readonly parent: ReferenceDataItem) {
         super(variable.name + ':', variable.variablesReference ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
         this.description = variable.value;
@@ -333,19 +356,22 @@ export class VariableReference extends ReferenceDataItem {
         }
     }
     getChildren() : vscode.ProviderResult<ReferenceDataItem[]> {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const items: ReferenceDataItem[] = [];
-                const variables = await this.getSnapshot().getVariables(this.variable.variablesReference) || [];
-                for (const variable of variables) {
-                    items.push(new VariableReference(variable, this));
+        if (!this.children) {
+            this.children = new Promise(async (resolve, reject) => {
+                try {
+                    const items: ReferenceDataItem[] = [];
+                    const variables = await this.getSnapshot().getVariables(this.variable.variablesReference) || [];
+                    for (const variable of variables) {
+                        items.push(new VariableReference(variable, this));
+                    }
+                    resolve(items);
+                } catch (error) {
+                    console.log(error);
+                    reject(error);
                 }
-                resolve(items);
-            } catch (error) {
-                console.log(error);
-                reject(error);
-            }
-        });
+            });
+        }
+        return this.children;
     }
     getSnapshot() : StackSnapshot {
         return this.parent.getSnapshot();

@@ -58,37 +58,8 @@ export class StackScopesDataProvider implements vscode.TreeDataProvider<ScopeDat
     }
 
     async onSnapshotCreated(snapshot: StackSnapshot) {
-        let topFrameItem: ScopeDataItem | undefined;
-        const sessionScope: DebugSessionScope = new DebugSessionScope(snapshot);
-
-        this._sessions.set(snapshot.id, sessionScope);
-
-        try {
-            const threads = await snapshot.threads() || [];
-            const modules = await snapshot.modules() || [];
-            for(const thread of threads) {
-
-                const frames = await snapshot.frames(thread.id) || [];
-                for(const frame of frames) {
-
-                    const module = modules.find((m: { id: any; }) => m.id === frame.moduleId);
-                    const frameItem = sessionScope.pushFrame(thread, module, frame);
-
-                    if (frames[0] === frame && snapshot.topThread === thread.id) {
-                        topFrameItem = frameItem;
-                    }
-                }
-            }
-        } catch (error) {
-            console.log(error);
-        }
-
+        this._sessions.set(snapshot.id, new DebugSessionScope(snapshot));
         this._onDidChangeTreeData.fire();
-
-        if (topFrameItem) {
-            topFrameItem.iconPath = new vscode.ThemeIcon('debug-stackframe');
-            vscode.commands.executeCommand('stackScopes.revealScopeTreeItem', topFrameItem);
-        }
     }
 }
 
@@ -100,7 +71,7 @@ export abstract class ScopeDataItem extends vscode.TreeItem {
 }
 
 export class DebugSessionScope extends ScopeDataItem {
-    private modules: Map<number, ModuleScope> = new Map<number, ModuleScope>();
+    private children: vscode.ProviderResult<ScopeDataItem[]>;
     private frames: Map<number, FrameScope> = new Map<number, FrameScope>();
     constructor(public readonly snapshot: StackSnapshot) {
         super(snapshot.name, vscode.TreeItemCollapsibleState.Collapsed);
@@ -109,23 +80,52 @@ export class DebugSessionScope extends ScopeDataItem {
         this.tooltip = snapshot.name;
         this.iconPath = new vscode.ThemeIcon('callstack-view-session', new vscode.ThemeColor('debugIcon.stopForeground'));
     }
-    pushFrame(thread: any, module: any, frame: any): FrameScope | undefined {
-        const id = frame.moduleId ? frame.moduleId : 0;
-        if (!this.modules.has(id)) {
-            this.modules.set(id, new ModuleScope(module, this));
-        }
-        const f = this.modules.get(id)?.pushFrame(thread, frame);
-        if (f) {
-            this.frames.set(frame.id, f);
-        }
-        return f;
-    }
     getChildren() : vscode.ProviderResult<ScopeDataItem[]> {
-        const children = [];
-        for (const child of this.modules.values()) {
-            children.push(child);
+        if (!this.children) {
+            this.children = new Promise(async (resolve, reject) => {
+                try {
+                    let topFrame: ScopeDataItem | undefined;
+                    const map: Map<number, ModuleScope> = new Map<number, ModuleScope>();
+
+                    const threads = await this.snapshot.threads() || [];
+                    const modules = await this.snapshot.modules() || [];
+                    for(const thread of threads) {
+
+                        const frames = await this.snapshot.frames(thread.id) || [];
+                        for(const frame of frames) {
+
+                            const module = modules.find((m: { id: any; }) => m.id === frame.moduleId);
+
+                            const id = frame.moduleId ? frame.moduleId : 0;
+                            if (!map.has(id)) {
+                                map.set(id, new ModuleScope(module, this));
+                            }
+                            const frameItem = map.get(id)?.pushFrame(thread, frame);
+                            if (frameItem) {
+                                this.frames.set(frame.id, frameItem);
+                            }
+
+                            if (frames[0] === frame && this.snapshot.topThread === thread.id) {
+                                topFrame = frameItem;
+                            }
+                        }
+                    }
+
+                    resolve(
+                        Array.from(map.values()).sort((l, r) => (l.label as string).localeCompare(r.label as string))
+                        );
+                    
+                    if (topFrame) {
+                        topFrame.iconPath = new vscode.ThemeIcon('debug-stackframe');
+                        vscode.commands.executeCommand('stackScopes.revealScopeTreeItem', topFrame);
+                    }
+                } catch (error) {
+                    console.log(error);
+                    reject(error);
+                }
+            });
+            return this.children;
         }
-        return Promise.resolve(children.sort((l, r) => (l.label as string).localeCompare(r.label as string)));
     }
     getParent() : vscode.ProviderResult<ScopeDataItem> {
         return undefined;
@@ -142,7 +142,7 @@ export class DebugSessionScope extends ScopeDataItem {
 }
 
 export class ModuleScope extends ScopeDataItem {
-    private scopes: Map<string, FunctionScope> = new Map<string, FunctionScope>();
+    private children: Map<string, FunctionScope> = new Map<string, FunctionScope>();
     constructor(public readonly module: any, public readonly parent: ScopeDataItem) {
         super(module?.name ? module.name : '', vscode.TreeItemCollapsibleState.Collapsed);
         this.contextValue = 'scope.module';
@@ -151,17 +151,15 @@ export class ModuleScope extends ScopeDataItem {
     }
     pushFrame(thread: any, frame: any): FrameScope | undefined {
         const key = frame.name + (frame.source ? frame.source.path : '');
-        if (!this.scopes.has(key)) {
-            this.scopes.set(key, new FunctionScope(frame, this));
+        if (!this.children.has(key)) {
+            this.children.set(key, new FunctionScope(frame, this));
         }
-        return this.scopes.get(key)?.pushFrame(thread, frame);
+        return this.children.get(key)?.pushFrame(thread, frame);
     }
     getChildren() : vscode.ProviderResult<ScopeDataItem[]> {
-        const children = [];
-        for (const child of this.scopes.values()) {
-            children.push(child);
-        }
-        return Promise.resolve(children.sort((l, r) => (l.label as string).localeCompare(r.label as string)));
+        return Promise.resolve(
+            Array.from(this.children.values()).sort((l, r) => (l.label as string).localeCompare(r.label as string))
+            );
     }
     getParent() : vscode.ProviderResult<ScopeDataItem> {
         return this.parent;
@@ -175,7 +173,7 @@ export class ModuleScope extends ScopeDataItem {
 }
 
 export class FunctionScope extends ScopeDataItem {
-    private frames: FrameScope[] = [];
+    private children: FrameScope[] = [];
     constructor(public readonly frame: any, public readonly parent: ScopeDataItem) {
         super(frame.name.substring(Math.max(frame.name.indexOf('!') + 1, 0)), vscode.TreeItemCollapsibleState.Collapsed);
         this.contextValue = 'scope.function';
@@ -184,15 +182,11 @@ export class FunctionScope extends ScopeDataItem {
         this.description = frame.source?.path ? path.parse(frame.source.path).base : 'Unknown Source';
     }
     pushFrame(thread: any, frame: any): FrameScope | undefined {
-        this.frames.push(new FrameScope(thread, frame, this));
-        return this.frames[this.frames.length - 1];
+        this.children.push(new FrameScope(thread, frame, this));
+        return this.children[this.children.length - 1];
     }
     getChildren() : vscode.ProviderResult<ScopeDataItem[]> {
-        const children = [];
-        for (const child of this.frames.values()) {
-            children.push(child);
-        }
-        return Promise.resolve(children);
+        return Promise.resolve(Array.from(this.children.values()));
     }
     getParent() : vscode.ProviderResult<ScopeDataItem> {
         return this.parent;
@@ -206,6 +200,7 @@ export class FunctionScope extends ScopeDataItem {
 }
 
 export class FrameScope extends ScopeDataItem {
+    private children: vscode.ProviderResult<ScopeDataItem[]>;
     constructor(public readonly thread: any, public readonly frame: any, public readonly parent: ScopeDataItem) {
         super('#' + frame.id, vscode.TreeItemCollapsibleState.Collapsed);
         this.description = 'Thread #' + thread.id;
@@ -222,19 +217,22 @@ export class FrameScope extends ScopeDataItem {
         }
     }
     getChildren(): vscode.ProviderResult<ScopeDataItem[]> {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const items: VariableScope[] = [];
-                const variables = await this.getSnapshot().getFrameVariables(this.frame.id) || [];
-                for (const variable of variables) {
-                    items.push(new VariableScope(variable, this.frame, this));
+        if (!this.children) {
+            this.children = new Promise(async (resolve, reject) => {
+                try {
+                    const items: VariableScope[] = [];
+                    const variables = await this.getSnapshot().getFrameVariables(this.frame.id) || [];
+                    for (const variable of variables) {
+                        items.push(new VariableScope(variable, this.frame, this));
+                    }
+                    resolve(items);
+                } catch (error) {
+                    console.log(error);
+                    reject(error);
                 }
-                resolve(items);
-            } catch (error) {
-                console.log(error);
-                reject(error);
-            }
-        });
+            });
+        }
+        return this.children;
     }
     getParent() : vscode.ProviderResult<ScopeDataItem> {
         return this.parent;
@@ -249,6 +247,7 @@ export class FrameScope extends ScopeDataItem {
 
 export class VariableScope extends ScopeDataItem {
     private evaluate: number = 0;
+    private children: vscode.ProviderResult<ScopeDataItem[]>;
     constructor(public readonly variable: any, public readonly frame: any, public readonly parent: ScopeDataItem) { 
         super(variable.name?.length > 0 ? variable.name + ':' : '', variable.variablesReference !== 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
         this.description = variable.value ? variable.value : variable.result;
@@ -256,31 +255,34 @@ export class VariableScope extends ScopeDataItem {
         this.tooltip = variable.type;
     }
     getChildren() : vscode.ProviderResult<ScopeDataItem[]> {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const items: ScopeDataItem[] = [];
-                const variables = await this.getSnapshot().getVariables(this.variable.variablesReference) || [];
-                if (this.variable.type.match(/^.*\*\s*(const)?\s*$/) && variables.length === 1 && variables[0].memoryReference) {
-                    const variable = { ...variables[0] };
-                    variable.name = '';
-                    items.push(new VariableScope(variable, this.frame, this));
-                    for(let i = 1; i <= this.evaluate; ++i) {
-                        const expression = '*((' + this.variable.evaluateName + ')+' + i + ')';
-                        const data = await this.getSnapshot().evaluateExpression(this.frame.id, expression);
-                        items.push(new VariableScope({ ...data, value: data.result, evaluateName: expression }, this.frame, this));
-                    }
-                    items.push(new EvaluateScope(this));
-                } else {
-                    for (const variable of variables) {
+        if (!this.children) {
+            this.children = new Promise(async (resolve, reject) => {
+                try {
+                    const items: ScopeDataItem[] = [];
+                    const variables = await this.getSnapshot().getVariables(this.variable.variablesReference) || [];
+                    if (this.variable.type.match(/^.*\*\s*(const)?\s*$/) && variables.length === 1 && variables[0].memoryReference) {
+                        const variable = { ...variables[0] };
+                        variable.name = '';
                         items.push(new VariableScope(variable, this.frame, this));
+                        for(let i = 1; i <= this.evaluate; ++i) {
+                            const expression = '*((' + this.variable.evaluateName + ')+' + i + ')';
+                            const data = await this.getSnapshot().evaluateExpression(this.frame.id, expression);
+                            items.push(new VariableScope({ ...data, value: data.result, evaluateName: expression }, this.frame, this));
+                        }
+                        items.push(new EvaluateScope(this));
+                    } else {
+                        for (const variable of variables) {
+                            items.push(new VariableScope(variable, this.frame, this));
+                        }
                     }
+                    resolve(items);
+                } catch (error) {
+                    console.log(error);
+                    reject(error);
                 }
-                resolve(items);
-            } catch (error) {
-                console.log(error);
-                reject(error);
-            }
-        });
+            });
+        }
+        return this.children;
     }
     getParent() : vscode.ProviderResult<ScopeDataItem> {
         return this.parent;
@@ -293,6 +295,7 @@ export class VariableScope extends ScopeDataItem {
     }
     evaluateNextElement() {
         this.evaluate = this.evaluate + 1;
+        this.children = undefined;
     }
 }
 
@@ -309,7 +312,7 @@ export class EvaluateScope extends ScopeDataItem {
         };
     }
     getChildren() : vscode.ProviderResult<ScopeDataItem[]> {
-        return null;
+        return undefined;
     }
     getParent() : vscode.ProviderResult<ScopeDataItem> {
         return this.parent;
