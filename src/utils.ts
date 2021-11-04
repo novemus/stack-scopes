@@ -12,7 +12,7 @@ function hash(value: string | undefined): number {
     return hash;
 }
 
-function toRawHexView(value: string): string {
+function toRawHexView(value: string | undefined): string {
     if (!value) {
         return '';
     }

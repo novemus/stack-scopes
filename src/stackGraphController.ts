@@ -1,8 +1,6 @@
 import * as vscode from 'vscode';
 import * as utils from './utils';
 import { StackSnapshotReviewer, StackSnapshot } from './debugSessionInterceptor';
-import { ScopeDataItem, VariableScope, FrameScope} from './stackScopesDataProvider';
-import { ReferenceDataItem, VariableReference, FrameReference } from './referencesDataProvider';
 
 class Section {
     public label: string | undefined = '';

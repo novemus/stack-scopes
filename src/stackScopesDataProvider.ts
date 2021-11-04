@@ -110,10 +110,11 @@ export class DebugSessionScope extends ScopeDataItem {
         this.iconPath = new vscode.ThemeIcon('callstack-view-session', new vscode.ThemeColor('debugIcon.stopForeground'));
     }
     pushFrame(thread: any, module: any, frame: any): FrameScope | undefined {
-        if (!this.modules.has(frame.moduleId ? frame.moduleId : '')) {
-            this.modules.set(frame.moduleId, new ModuleScope(module, this));
+        const id = frame.moduleId ? frame.moduleId : 0;
+        if (!this.modules.has(id)) {
+            this.modules.set(id, new ModuleScope(module, this));
         }
-        const f = this.modules.get(frame.moduleId)?.pushFrame(thread, frame);
+        const f = this.modules.get(id)?.pushFrame(thread, frame);
         if (f) {
             this.frames.set(frame.id, f);
         }

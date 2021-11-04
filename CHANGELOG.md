@@ -11,3 +11,7 @@
 ## 1.2.0 (October 15, 2021)
 
 - Evaluate elements of dynamically allocated arrays.
+
+## 1.3.0 (November 4, 2021)
+
+- Search for references to variables.

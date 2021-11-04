@@ -1,17 +1,17 @@
 import * as vscode from 'vscode';
 
 export function longReferencePath(): number {
-    const value : number | undefined = vscode.workspace.getConfiguration('stackScopes').get('longReferencePath');
+    const value : number | undefined = vscode.workspace.getConfiguration('stackScopes.reference').get('longPath');
     return value && value > 0 ? value : 16;
 }
 
-export function shortRferencePath(): number {
-    const value : number | undefined = vscode.workspace.getConfiguration('stackScopes').get('shortRferencePath');
+export function shortReferencePath(): number {
+    const value : number | undefined = vscode.workspace.getConfiguration('stackScopes.reference').get('shortPath');
     return value && value > 0 ? value : 4;
 }
 
 export function searchResultLimit(): number {
-    const value : number | undefined = vscode.workspace.getConfiguration('stackScopes').get('searchResultLimit');
+    const value : number | undefined = vscode.workspace.getConfiguration('stackScopes.search').get('resultLimit');
     return value && value > 0 ? value : 64;
 }
 
@@ -27,9 +27,10 @@ export interface StackSnapshotReviewer {
 }
 
 export interface Reference {
-    thread: any;
-    frame: any;
-    chain: any[];
+    readonly thread?: any;
+    readonly frame?: any;
+    readonly variable?: any;
+    readonly path?: string[];
 }
 
 export class StackSnapshot {
@@ -120,14 +121,18 @@ export class StackSnapshot {
     async getVariables(reference: number): Promise<readonly any[] | undefined> {
         return new Promise(async (resolve, reject) => {
             try {
-                const { variables } = await this.session.customRequest('variables', {
-                    variablesReference: reference,
-                    filter: undefined,
-                    start: 0,
-                    count: undefined,
-                    format: { hex: false }
-                });
-                resolve(variables);
+                if (reference !== 0) {
+                    const { variables } = await this.session.customRequest('variables', {
+                        variablesReference: reference,
+                        filter: undefined,
+                        start: 0,
+                        count: undefined,
+                        format: { hex: false }
+                    });
+                    resolve(variables);
+                } else {
+                    reject('zero reference');
+                }
             } catch (error) {
                 console.log(error);
                 reject(error);
@@ -177,18 +182,52 @@ export class StackSnapshot {
 
     searchReferences(pointer: number, depth: number, progress: Progress, target?: Reference): Promise<Reference[]> {
         const snapshot = this;
-        const chainLimit = longReferencePath();
+        const verified = new Set<number>();
 
-        const search = async (pointer: number, depth: number, job: number, control: Progress, target: Reference, verified: Set<number>): Promise<Reference[]> => {
+        class VariableReference implements Reference {
+            static maxPathLength: number = longReferencePath();
+            public readonly thread: any;
+            public readonly frame: any;
+            public readonly path: string[] = [];
+            public readonly variable: any;
+            constructor(thread?: any, frame?: any, path?: string[], variable?: any) {
+                this.thread = thread;
+                this.frame = frame;
+                if (path) {
+                    this.path = path;
+                }
+                this.variable = variable;
+            }
+            public static addThread(reference: Reference, thread: any) : Reference {
+                return new VariableReference(thread, reference.frame, reference.path?.slice(0, VariableReference.maxPathLength), reference.variable);
+            }
+            public static addFrame(reference: Reference, frame: any) : Reference {
+                return new VariableReference(reference.thread, frame, reference.path?.slice(0, VariableReference.maxPathLength), reference.variable);
+            }
+            public static addVariable(reference: Reference, variable: any) : Reference {
+                if (reference.variable) {
+                    let path = reference.path?.slice(0, VariableReference.maxPathLength);
+                    if (!path) {
+                        path = [reference.variable.name];
+                    } else if (path.length < VariableReference.maxPathLength) {
+                        path.push(reference.variable.name);
+                    }
+                    return new VariableReference(reference.thread, reference.frame, path, variable);
+                }
+                return new VariableReference(reference.thread, reference.frame, reference.path?.slice(0, VariableReference.maxPathLength), variable);
+            }
+        }
+
+        const search = async (pointer: number, depth: number, job: number, control: Progress, target: Reference): Promise<Reference[]> => {
             let references: Reference[] = [];
             if (!control.abort()) {
-                if (!target?.thread) {
+                if (!target.thread) {
                     const threads = await snapshot.threads() || [];
                     for(const thread of threads) {
                         if (control.abort()) {
                             break;
                         }
-                        const places = await search(pointer, depth, job / threads.length, control, { thread: thread, frame: target?.frame, chain: target?.chain }, verified);
+                        const places = await search(pointer, depth, job / threads.length, control, VariableReference.addThread(target, thread));
                         if (places.length > 0) {
                             references = [...references, ...places];
                         }
@@ -199,13 +238,15 @@ export class StackSnapshot {
                         if (control.abort()) {
                             break;
                         }
-                        const places = await search(pointer, depth - 1, job / frames.length, control, { thread: target.thread, frame: frame, chain: target?.chain }, verified);
+                        const places = await search(pointer, depth - 1, job / frames.length, control, VariableReference.addFrame(target, frame));
                         if (places.length > 0) {
                             references = [...references, ...places];
                         }
                     }
                 } else {
-                    const variables = !target.chain || target.chain.length === 0 ? await snapshot.getFrameVariables(target.frame.id) : await this.getVariables(target.chain[target.chain.length - 1].variablesReference);
+                    const variables = target.variable 
+                                    ? await this.getVariables(target.variable.variablesReference)
+                                    : await snapshot.getFrameVariables(target.frame.id);
                     if (variables) {
                         for(const variable of variables) {
                             if (control.abort()) {
@@ -225,13 +266,11 @@ export class StackSnapshot {
                             }
     
                             if (ptr === pointer) {
-                                let chain = target.chain.slice(0, chainLimit);
-                                references.push({ thread: target.thread, frame: target.frame, chain: [ ...chain, variable ] });
+                                references.push(VariableReference.addVariable(target, variable));
                                 control.yield(1);
-                            }
-                            else if (depth > 0 && ptr !== 0 && variable.variablesReference !== 0 && !verified.has(ptr)) {
+                            } else if (depth > 0 && variable.variablesReference !== 0 && ptr !== 0 && !verified.has(ptr)) {
                                 verified.add(ptr);
-                                const places = await search(pointer, depth - 1, job / variables.length, control, { thread: target.thread, frame: target.frame, chain: [ ...target.chain, variable ] }, verified);
+                                const places = await search(pointer, depth - 1, job / variables.length, control, VariableReference.addVariable(target, variable));
                                 if (places.length > 0) {
                                     references = [...references, ...places];
                                 }
@@ -244,7 +283,7 @@ export class StackSnapshot {
             return references;
         };
 
-        return search(pointer, depth, 100.0, progress, target ? target : { thread: null, frame: null, chain: [] }, new Set<number>());
+        return search(pointer, depth, 100.0, progress, target ? target : new VariableReference());
     }
 }
 

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as utils from './utils';
-import { Reference, longReferencePath, shortRferencePath, searchResultLimit } from './debugSessionInterceptor';
+import { Reference, longReferencePath, shortReferencePath, searchResultLimit } from './debugSessionInterceptor';
 import { StackSnapshot, StackSnapshotReviewer } from './debugSessionInterceptor';
 import { ScopeDataItem, VariableScope } from './stackScopesDataProvider';
 
@@ -196,6 +196,9 @@ export class SearchReference extends ReferenceDataItem {
         this.contextValue = 'reference.references';
         this.tooltip = name;
         this.iconPath = new vscode.ThemeIcon('references', new vscode.ThemeColor('debugIcon.pauseForeground'));
+
+        FoldReference.longPathLength = longReferencePath();
+        FoldReference.shortPathLength = shortReferencePath();
     }
     getChildren() : vscode.ProviderResult<ReferenceDataItem[]> {
         return new Promise(async (resolve, reject) => {
@@ -205,7 +208,7 @@ export class SearchReference extends ReferenceDataItem {
                     if (!map.has(reference.frame.id)) {
                         map.set(reference.frame.id, new FrameReference(reference.frame, reference.thread, this));
                     }
-                    map.get(reference.frame.id)?.pushChain(reference.chain);
+                    map.get(reference.frame.id)?.pushReference(reference);
                 });
                 resolve(Array.from(map.values()));
             } catch (error) {
@@ -226,7 +229,7 @@ export class SearchReference extends ReferenceDataItem {
 }
 
 export class FrameReference extends ReferenceDataItem {
-    private chains: any[][] = [];
+    private references: Reference[] = [];
     constructor(public readonly frame: any, public readonly thread: any, public readonly parent: SearchReference) {
         super(frame.name, vscode.TreeItemCollapsibleState.Expanded);
         this.contextValue = 'reference.frame';
@@ -241,27 +244,24 @@ export class FrameReference extends ReferenceDataItem {
             };
         }
     }
-    pushChain(chain: any[]) {
-        if (chain.length > 0) {
-            this.chains.push(chain);
-        }
+    pushReference(reference: Reference) {
+        this.references.push(reference);
     }
     getChildren() : vscode.ProviderResult<ReferenceDataItem[]> {
         return new Promise(async (resolve, reject) => {
             try {
                 let folds = new Map<string, ReferenceDataItem>();
                 let variables: ReferenceDataItem[] = [];
-                this.chains.forEach(chain => {
-                    if (chain.length === 1) {
-                        variables.push(new VariableReference(chain[0], this));
-                    }
-                    else if (chain.length > 1) {
-                        const path = chain.slice(0, chain.length - 1).map(item => item.name).join('>');
+                this.references.forEach(reference => {
+                    if (reference.path?.length === 0 && reference.variable) {
+                        variables.push(new VariableReference(reference.variable, this));
+                    } else if (reference.path && reference.path?.length > 0) {
+                        const path = reference.path.join('>');
                         if (!folds.has(path)) {
-                            folds.set(path, new FoldReference(chain.slice(0, chain.length - 1), this));
+                            folds.set(path, new FoldReference(reference.path, this));
                         }
                         const fold = folds.get(path) as FoldReference;
-                        fold.pushVariable(chain[chain.length - 1]);
+                        fold.pushVariable(reference.variable);
                     }
                 });
                 resolve(variables.concat(Array.from(folds.values())));
@@ -283,29 +283,29 @@ export class FrameReference extends ReferenceDataItem {
 }
 
 export class FoldReference extends ReferenceDataItem {
+    public static longPathLength: number = longReferencePath();
+    public static shortPathLength: number = shortReferencePath();
     private variables: any[] = [];
-    constructor(public readonly chain: any[], public readonly parent: ReferenceDataItem) {
-        super(FoldReference.makeShortPath(chain), vscode.TreeItemCollapsibleState.Expanded);
+    constructor(public readonly path: string[], public readonly parent: ReferenceDataItem) {
+        super(FoldReference.makeShortPathLabel(path), vscode.TreeItemCollapsibleState.Expanded);
         this.contextValue = 'reference.fold';
-        this.tooltip = FoldReference.makeLongPath(chain);
+        this.tooltip = FoldReference.makeLongPathLabel(path);
     }
-    private static makeShortPath(chain: any[]): string {
-        const shortPathLen = shortRferencePath();
-        const longPathLen = longReferencePath();
-        if (chain.length >= longPathLen) {
-            return chain.slice(0, shortPathLen).map(item => item.name).join(' > ') + ' ...';
-        } else if (chain.length === 1) {
-            return chain[0].name;
-        } else if (chain.length > shortPathLen) {
-            return chain.slice(0, shortPathLen - 1).map(item => item.name).join(' > ') + ' ... ' + chain[chain.length - 1].name;
+    private static makeShortPathLabel(path: any[]): string {
+        if (path.length >= FoldReference.longPathLength) {
+            return path.slice(0, FoldReference.shortPathLength).join(' > ') + ' ...';
+        } else if (path.length === 1) {
+            return path[0];
+        } else if (path.length > FoldReference.shortPathLength) {
+            return path.slice(0, FoldReference.shortPathLength - 1).join(' > ') + ' ... ' + path[path.length - 1];
         }
-        return chain.map(item => item.name).join(' > ');
+        return path.join(' > ');
     }
-    private static makeLongPath(chain: any[]): string {
-        if (chain.length >= longReferencePath()) {
-            return chain.map(item => item.name).join(' > ') + ' ...';
+    private static makeLongPathLabel(path: any[]): string {
+        if (path.length >= FoldReference.longPathLength) {
+            return path.slice(0, FoldReference.longPathLength).join(' > ') + ' ...';
         }
-        return chain.map(item => item.name).join(' > ');
+        return path.join(' > ');
     }
     pushVariable(variable: any) {
         this.variables.push(variable);
