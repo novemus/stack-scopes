@@ -213,14 +213,32 @@ class Context {
             elements.forEach(element => {
                 element.style.backgroundColor = color;
             });
+
+            if(!this.drawAll) {
+                this.showColorized();
+            }
+
+            let scroll = undefined;
+            elements.forEach(element => {
+                const y = element.getBoundingClientRect().y;
+                if (scroll === undefined) {
+                    scroll = y;
+                } else {
+                    scroll = Math.min(scroll, y);
+                }
+            });
+
+            if (scroll) {
+                window.scrollBy(0, scroll);
+            }
         } else {
             elements.forEach(element => {
                 element.style.backgroundColor = '';
             });
-        }
 
-        if(!this.drawAll) {
-            this.showColorized();
+            if(!this.drawAll) {
+                this.showColorized();
+            }
         }
     }
 

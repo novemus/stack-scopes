@@ -25,11 +25,11 @@ function toRawHexView(value: string | undefined): string {
 }
 
 export function makeModuleTag(moduleId: any): string {
-    return 'module-' + toRawHexView(moduleId?.toString());
+    return 'module-' + toRawHexView(moduleId ? moduleId.toString() : '0');
 }
 
 export function makeFrameTag(frameId: any): string {
-    return 'frame-' + toRawHexView(frameId?.toString());
+    return 'frame-' + toRawHexView(frameId ? frameId.toString() : '0');
 }
 
 export function makeFunctionTag(name?: string, path?: string): string {
@@ -37,9 +37,9 @@ export function makeFunctionTag(name?: string, path?: string): string {
 }
 
 export function makeObjectTag(value: any): string {
-    return 'obj-' + toRawHexView(value?.toString());
+    return 'obj-' + toRawHexView(value ? value?.toString() : '0');
 }
 
 export function makeVoidTag(value: any): string {
-    return 'void-' + toRawHexView(value?.toString());
+    return 'void-' + toRawHexView(value ? value.toString() : '0');
 }

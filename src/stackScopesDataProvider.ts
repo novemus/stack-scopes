@@ -165,7 +165,7 @@ export class ModuleScope extends ScopeDataItem {
         return this.parent;
     }
     getTag() : string | undefined {
-        return utils.makeModuleTag(this.module ? this.module.id : 0);
+        return utils.makeModuleTag(this.module?.id);
     }
     getSnapshot() : StackSnapshot {
         return this.parent.getSnapshot();
