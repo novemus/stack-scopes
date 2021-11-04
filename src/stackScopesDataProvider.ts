@@ -56,7 +56,7 @@ export class StackScopesDataProvider implements vscode.TreeDataProvider<ScopeDat
         this._sessions.delete(snapshot.id);
         this._onDidChangeTreeData.fire();
     }
-    
+
     async onSnapshotCreated(snapshot: StackSnapshot) {
         let topFrameItem: ScopeDataItem | undefined;
         const sessionScope: DebugSessionScope = new DebugSessionScope(snapshot);

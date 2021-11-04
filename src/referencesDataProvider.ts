@@ -33,7 +33,6 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
     onSnapshotRemoved(snapshot: StackSnapshot) {
         this._sessions.delete(snapshot.id);
         this._onDidChangeTreeData.fire();
-        this.refreshVisibility();
     }
     onSnapshotCreated(snapshot: StackSnapshot) {
         this._sessions.set(snapshot.id, new DebugSessionReference(snapshot));
@@ -125,9 +124,7 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
                 }
 
                 session.pushBunch(name, references);
-
                 this._onDidChangeTreeData.fire();
-                vscode.commands.executeCommand('setContext', 'stackScopes.showReferences', true);
             });
         }
     }
@@ -136,7 +133,6 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
         if (snapshot && this._sessions.has(snapshot.id)) {
             this._sessions.get(snapshot.id)?.bunches.delete(bunch.name);
             this._onDidChangeTreeData.fire();
-            this.refreshVisibility();
         }
     }
     clear() {
@@ -144,16 +140,6 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
             session.bunches.clear();
         }
         this._onDidChangeTreeData.fire();
-        this.refreshVisibility();
-    }
-    refreshVisibility() {
-        let show = false;
-        this._sessions.forEach(session => {
-            if (session.bunches.size > 0) {
-                show = true;
-            }
-        });
-        vscode.commands.executeCommand('setContext', 'stackScopes.showReferences', show);
     }
 }
 
@@ -233,8 +219,8 @@ export class FrameReference extends ReferenceDataItem {
     constructor(public readonly frame: any, public readonly thread: any, public readonly parent: SearchReference) {
         super(frame.name, vscode.TreeItemCollapsibleState.Expanded);
         this.contextValue = 'reference.frame';
-        this.description = 'Thread #' + thread.id;
-        this.tooltip = frame.source && frame.source.path !== '' ? path.parse(frame.source.path).base + ':' + frame.line : 'Unknown Source';
+        this.description = 'Frame #' + frame.id;
+        this.tooltip = 'Thread #' + thread.id;
         this.iconPath = new vscode.ThemeIcon('debug-stackframe-focused');
         if (frame.source?.path) {
             this.command = {

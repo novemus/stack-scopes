@@ -288,7 +288,7 @@ export class StackSnapshot {
 }
 
 export class DebugSessionInterceptor implements vscode.DebugAdapterTrackerFactory {
-    private reviewers: StackSnapshotReviewer[] = [];
+    private reviewers: Set<StackSnapshotReviewer> = new Set<StackSnapshotReviewer>();
     private sessions: Map<string, StackSnapshot> = new Map<string, StackSnapshot>();
 
     constructor(context: vscode.ExtensionContext) {
@@ -322,7 +322,21 @@ export class DebugSessionInterceptor implements vscode.DebugAdapterTrackerFactor
     }
 
     subscribeStackSnapshot(reviewer: StackSnapshotReviewer): void {
-        this.reviewers.push(reviewer);
+        this.reviewers.add(reviewer);
+        if (reviewer) {
+            for(const snapshot of this.sessions.values()) {
+                reviewer.onSnapshotCreated(snapshot);
+            }
+        }
+    }
+
+    unsubscribeStackSnapshot(reviewer: StackSnapshotReviewer): void {
+        this.reviewers.delete(reviewer);
+        if (reviewer) {
+            for(const snapshot of this.sessions.values()) {
+                reviewer.onSnapshotRemoved(snapshot);
+            }
+        }
     }
 
     getSnapshot(id: string): StackSnapshot | undefined {

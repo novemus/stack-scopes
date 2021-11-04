@@ -10,22 +10,22 @@ export function activate(context: vscode.ExtensionContext) {
 	console.log('activating "stack-scopes" extension');
 
     const sessionInterceptor = new DebugSessionInterceptor(context);
-    const stackDataProvider = new StackScopesDataProvider(context);
-    const refsDataProvider = new ReferencesDataProvider(context);
-    const stackGraphController = new StackGraphController(context);
 
+    const stackDataProvider = new StackScopesDataProvider(context);
     const stackScopesTreeView = vscode.window.createTreeView('stackScopes', {
         treeDataProvider: stackDataProvider,
         showCollapseAll: true
       });
+    sessionInterceptor.subscribeStackSnapshot(stackDataProvider);
 
+    const refsDataProvider = new ReferencesDataProvider(context);
     const referencesTreeView = vscode.window.createTreeView('references', {
         treeDataProvider: refsDataProvider,
         showCollapseAll: true
     });
-
-    sessionInterceptor.subscribeStackSnapshot(stackDataProvider);
     sessionInterceptor.subscribeStackSnapshot(refsDataProvider);
+
+    const stackGraphController = new StackGraphController(context);
     sessionInterceptor.subscribeStackSnapshot(stackGraphController);
 
     if (stackScopesTreeView) {

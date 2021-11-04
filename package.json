@@ -56,8 +56,7 @@
         },
         {
           "id": "references",
-          "name": "References",
-          "when": "stackScopes.showReferences"
+          "name": "References"
         }
       ]
     },
@@ -95,11 +94,6 @@
         "icon": "$(close-all)"
       },
       {
-        "command": "stackScopes.revealReferences",
-        "title": "Reveal References",
-        "icon": "$(list-tree)"
-      },
-      {
         "command": "stackScopes.drawOnlyColorizedStacks",
         "title": "Draw Only Colorized Stacks",
         "icon": "$(screen-normal)",
@@ -134,10 +128,6 @@
         },
         {
           "command": "stackScopes.clearReferenceTree",
-          "when": "false"
-        },
-        {
-          "command": "stackScopes.revealReferences",
           "when": "false"
         }
       ],
