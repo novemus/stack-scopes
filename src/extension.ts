@@ -107,6 +107,15 @@ export function activate(context: vscode.ExtensionContext) {
             })
         );
         context.subscriptions.push(
+            vscode.commands.registerCommand('stackScopes.revealReferenceOnGraph', (item: ReferenceDataItem) => {
+                const reference = item.getReference();
+                const snapshot = item.getSnapshot();
+                if (snapshot && reference) {
+                    stackGraphController.revealReference(snapshot, reference);
+                }
+            })
+        );
+        context.subscriptions.push(
             vscode.commands.registerCommand('stackScopes.drawOnlyColorizedStacks', () => {
                 stackGraphController.drawOnlyColorizedStacksOnActiveGraph();
             })

@@ -94,6 +94,11 @@
         "icon": "$(close-all)"
       },
       {
+        "command": "stackScopes.revealReferenceOnGraph",
+        "title": "Reveal on Graph",
+        "icon": "$(list-tree)"
+      },
+      {
         "command": "stackScopes.drawOnlyColorizedStacks",
         "title": "Draw Only Colorized Stacks",
         "icon": "$(screen-normal)",
@@ -129,6 +134,10 @@
         {
           "command": "stackScopes.clearReferenceTree",
           "when": "false"
+        },
+        {
+          "command": "stackScopes.revealReferenceOnGraph",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -152,6 +161,11 @@
         {
           "command": "stackScopes.colorizeByTag",
           "when": "viewItem == 'scope.frame' || viewItem == 'scope.this' || viewItem == 'scope.function' || viewItem == 'scope.module' || viewItem == 'reference.frame' || viewItem == 'reference.this'",
+          "group": "inline"
+        },
+        {
+          "command": "stackScopes.revealReferenceOnGraph",
+          "when": "viewItem == 'reference.variable' || viewItem == 'reference.this'",
           "group": "inline"
         },
         {

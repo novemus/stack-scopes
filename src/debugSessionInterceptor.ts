@@ -30,7 +30,7 @@ export interface Reference {
     readonly thread?: any;
     readonly frame?: any;
     readonly variable?: any;
-    readonly path?: string[];
+    readonly chain?: any[];
 }
 
 export class StackSnapshot {
@@ -187,33 +187,33 @@ export class StackSnapshot {
             static maxPathLength: number = longReferencePath();
             public readonly thread: any;
             public readonly frame: any;
-            public readonly path: string[] = [];
+            public readonly chain: any[] = [];
             public readonly variable: any;
-            constructor(thread?: any, frame?: any, path?: string[], variable?: any) {
+            constructor(thread?: any, frame?: any, chain?: any[], variable?: any) {
                 this.thread = thread;
                 this.frame = frame;
-                if (path) {
-                    this.path = path;
+                if (chain) {
+                    this.chain = chain;
                 }
                 this.variable = variable;
             }
             public static addThread(reference: Reference, thread: any) : Reference {
-                return new VariableReference(thread, reference.frame, reference.path?.slice(0, VariableReference.maxPathLength), reference.variable);
+                return new VariableReference(thread, reference.frame, reference.chain?.slice(0, VariableReference.maxPathLength), reference.variable);
             }
             public static addFrame(reference: Reference, frame: any) : Reference {
-                return new VariableReference(reference.thread, frame, reference.path?.slice(0, VariableReference.maxPathLength), reference.variable);
+                return new VariableReference(reference.thread, frame, reference.chain?.slice(0, VariableReference.maxPathLength), reference.variable);
             }
             public static addVariable(reference: Reference, variable: any) : Reference {
                 if (reference.variable) {
-                    let path = reference.path?.slice(0, VariableReference.maxPathLength);
-                    if (!path) {
-                        path = [reference.variable.name];
-                    } else if (path.length < VariableReference.maxPathLength) {
-                        path.push(reference.variable.name);
+                    let chain = reference.chain?.slice(0, VariableReference.maxPathLength);
+                    if (!chain) {
+                        chain = [reference.variable];
+                    } else if (chain.length < VariableReference.maxPathLength) {
+                        chain.push(reference.variable);
                     }
-                    return new VariableReference(reference.thread, reference.frame, path, variable);
+                    return new VariableReference(reference.thread, reference.frame, chain, variable);
                 }
-                return new VariableReference(reference.thread, reference.frame, reference.path?.slice(0, VariableReference.maxPathLength), variable);
+                return new VariableReference(reference.thread, reference.frame, reference.chain?.slice(0, VariableReference.maxPathLength), variable);
             }
         }
 

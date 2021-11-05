@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as utils from './utils';
-import { StackSnapshotReviewer, StackSnapshot } from './debugSessionInterceptor';
+import { StackSnapshotReviewer, StackSnapshot, Reference } from './debugSessionInterceptor';
 
 class Section {
     public label: string | undefined = '';
@@ -58,6 +58,17 @@ export class StackGraphController implements StackSnapshotReviewer {
         if (panel) {
             panel.reveal();
             panel.webview.postMessage({ command: 'colorize-by-tag', tag: tag });
+        }
+    }
+
+    async revealReference(snapshot: StackSnapshot, reference: Reference) {
+        if (!this.graphs.has(snapshot.id)) {
+            await this.openGraph(snapshot);
+        }
+        const panel = this.graphs.get(snapshot.id);
+        if (panel) {
+            panel.reveal();
+            panel.webview.postMessage({ command: 'expand-path', reference: reference });
         }
     }
 

@@ -155,6 +155,7 @@ export abstract class ReferenceDataItem extends vscode.TreeItem {
     abstract getChildren() : vscode.ProviderResult<ReferenceDataItem[]>;
     abstract getSnapshot() : StackSnapshot;
     abstract getTag() : string | undefined;
+    abstract getReference() : Reference | undefined;
 }
 
 export class DebugSessionReference extends ReferenceDataItem {
@@ -182,6 +183,9 @@ export class DebugSessionReference extends ReferenceDataItem {
         return undefined;
     }
     getParent() : vscode.ProviderResult<ReferenceDataItem> {
+        return undefined;
+    }
+    getReference() : Reference | undefined {
         return undefined;
     }
 }
@@ -226,6 +230,9 @@ export class SearchReference extends ReferenceDataItem {
     getParent() : vscode.ProviderResult<ReferenceDataItem> {
         return this.parent;
     }
+    getReference() : Reference | undefined {
+        return undefined;
+    }
 }
 
 export class FrameReference extends ReferenceDataItem {
@@ -255,12 +262,12 @@ export class FrameReference extends ReferenceDataItem {
                     let folds = new Map<string, ReferenceDataItem>();
                     let variables: ReferenceDataItem[] = [];
                     this.references.forEach(reference => {
-                        if (reference.path?.length === 0 && reference.variable) {
+                        if (reference.chain?.length === 0 && reference.variable) {
                             variables.push(new VariableReference(reference.variable, this));
-                        } else if (reference.path && reference.path?.length > 0) {
-                            const path = reference.path.join('>');
+                        } else if (reference.chain && reference.chain.length > 0) {
+                            const path = reference.chain.map(c => c.name).join('>');
                             if (!folds.has(path)) {
-                                folds.set(path, new FoldReference(reference.path, this));
+                                folds.set(path, new FoldReference(reference.chain, this));
                             }
                             const fold = folds.get(path) as FoldReference;
                             fold.pushVariable(reference.variable);
@@ -284,6 +291,9 @@ export class FrameReference extends ReferenceDataItem {
     getParent() : vscode.ProviderResult<ReferenceDataItem> {
         return this.parent;
     }
+    getReference() : Reference | undefined {
+        return { frame: this.frame, thread: this.thread };
+    }
 }
 
 export class FoldReference extends ReferenceDataItem {
@@ -291,26 +301,26 @@ export class FoldReference extends ReferenceDataItem {
     public static shortPathLength: number = shortReferencePath();
     private variables: any[] = [];
     private children: vscode.ProviderResult<ReferenceDataItem[]>;
-    constructor(public readonly path: string[], public readonly parent: ReferenceDataItem) {
-        super(FoldReference.makeShortPathLabel(path), vscode.TreeItemCollapsibleState.Expanded);
+    constructor(public readonly chain: any[], public readonly parent: ReferenceDataItem) {
+        super(FoldReference.makeShortPathLabel(chain), vscode.TreeItemCollapsibleState.Expanded);
         this.contextValue = 'reference.fold';
-        this.tooltip = FoldReference.makeLongPathLabel(path);
+        this.tooltip = FoldReference.makeLongPathLabel(chain);
     }
-    private static makeShortPathLabel(path: any[]): string {
-        if (path.length >= FoldReference.longPathLength) {
-            return path.slice(0, FoldReference.shortPathLength).join(' > ') + ' ...';
-        } else if (path.length === 1) {
-            return path[0];
-        } else if (path.length > FoldReference.shortPathLength) {
-            return path.slice(0, FoldReference.shortPathLength - 1).join(' > ') + ' ... ' + path[path.length - 1];
+    private static makeShortPathLabel(chain: any[]): string {
+        if (chain.length >= FoldReference.longPathLength) {
+            return chain.slice(0, FoldReference.shortPathLength).map(c => c.name).join(' > ') + ' ...';
+        } else if (chain.length === 1) {
+            return chain[0].name;
+        } else if (chain.length > FoldReference.shortPathLength) {
+            return chain.slice(0, FoldReference.shortPathLength - 1).map(c => c.name).join(' > ') + ' ... ' + chain[chain.length - 1].name;
         }
-        return path.join(' > ');
+        return chain.map(c => c.name).join(' > ');
     }
-    private static makeLongPathLabel(path: any[]): string {
-        if (path.length >= FoldReference.longPathLength) {
-            return path.slice(0, FoldReference.longPathLength).join(' > ') + ' ...';
+    private static makeLongPathLabel(chain: any[]): string {
+        if (chain.length >= FoldReference.longPathLength) {
+            return chain.slice(0, FoldReference.longPathLength).map(c => c.name).join(' > ') + ' ...';
         }
-        return path.join(' > ');
+        return chain.map(c => c.name).join(' > ');
     }
     pushVariable(variable: any) {
         this.variables.push(variable);
@@ -341,6 +351,13 @@ export class FoldReference extends ReferenceDataItem {
     }
     getParent() : vscode.ProviderResult<ReferenceDataItem> {
         return this.parent;
+    }
+    getReference() : Reference | undefined {
+        const reference = this.parent.getReference();
+        if (reference) {
+            return { ...reference, chain: this.chain };
+        }
+        return { chain: this.chain };
     }
 }
 
@@ -381,5 +398,12 @@ export class VariableReference extends ReferenceDataItem {
     }
     getParent() : vscode.ProviderResult<ReferenceDataItem> {
         return this.parent;
+    }
+    getReference() : Reference {
+        const reference = this.parent.getReference();
+        if (reference) {
+            return { ...reference, variable: this.variable };
+        }
+        return { variable: this.variable };
     }
 }

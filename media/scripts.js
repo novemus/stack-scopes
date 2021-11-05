@@ -38,11 +38,10 @@ class Frame {
         frameCell.setAttribute('tag', this.frame.tag);
 
         const badge = document.createElement("div");
-        badge.className = 'badge';
+        badge.id = 'frame-badge-' + this.id;
         badge.textContent = this.frame.value;
-        frameCell.appendChild(badge);
-
-        frameCell.addEventListener('click', event => {
+        badge.style.transform = 'rotate(0deg)';
+        badge.addEventListener('click', event => {
             if (!event.ctrlKey) {
                 if (badge.style.transform === 'rotate(90deg)') {
                     badge.style.transform = 'rotate(0deg)';
@@ -57,6 +56,8 @@ class Frame {
                         scope.style.display = 'table-cell';
                         if (scope.childElementCount === 0) {
                             this.api.postMessage({ command: 'get-frame-scope', frame: this.id });
+                        } else {
+                            document.dispatchEvent(new CustomEvent("populated", { detail: { scope: scope }}));
                         }
                     }
                 } else {
@@ -65,6 +66,7 @@ class Frame {
                 event.stopPropagation();
             }
         });
+        frameCell.appendChild(badge);
 
         const moduleCell = document.createElement("td");
         moduleCell.className = 'module';
@@ -242,6 +244,62 @@ class Context {
         }
     }
 
+    expandPath(reference) {
+        const badgeId = 'frame-badge-' + reference.frame.id;
+        const scopeId = 'frame-scope-' + reference.frame.id;
+        const badge = document.getElementById(badgeId);
+        if (!badge) {
+            throw new Error('element "' + badgeId + '" not found');
+        }
+
+        if (badge.style.transform === 'rotate(0deg)') {
+            if (reference.chain || reference.variable) {
+                const callback = event => {
+                    if (event.detail.scope.id === scopeId) {
+                        this.expandPath(reference);
+                        document.removeEventListener('populated', callback);
+                    }
+                };
+                document.addEventListener('populated', callback);
+                setTimeout(() => {
+                    document.removeEventListener('populated', callback);
+                    console.log('expand timeout');
+                }, 2000);
+            }
+            return badge.click();
+        }
+
+        const scope = document.getElementById(scopeId);
+        if (reference.chain) {
+            for(const variable of reference.chain) {
+                const badge = scope.querySelector(`[evaluate-name="${variable.evaluateName}"]`);
+                if (!badge) {
+                    throw new Error('badge element "' + variable.evaluateName + '" not found');
+                }
+                if (badge.textContent === '+') {
+                    const callback = event => {
+                        if (event.detail.scope.getAttribute('evaluate-name') === variable.evaluateName) {
+                            this.expandPath(reference);
+                            document.removeEventListener('populated', callback);
+                        }
+                    };
+                    document.addEventListener('populated', callback);
+                    setTimeout(() => {
+                        document.removeEventListener('populated', callback);
+                        console.log('expand timeout');
+                    }, 2000);
+                    return badge.click();
+                }
+            };
+        }
+        if (reference.variable) {
+            const badge = scope.querySelector(`[evaluate-name="${reference.variable.evaluateName}"]`);
+            if (badge && badge.textContent === '+') {
+                return badge.click();
+            }
+        }
+    }
+
     populateScope(data) {
         if (data.variables.length === 0) {
             return;
@@ -263,6 +321,7 @@ class Context {
     
             const badge = document.createElement('div');
             badge.className = 'var-badge';
+            badge.setAttribute('evaluate-name', item.evaluateName);
             badge.innerHTML = item.variablesReference ? '+' : '&ensp;';
     
             const name = document.createElement('span');
@@ -284,6 +343,7 @@ class Context {
             if (item.variablesReference) {
                 const scope = document.createElement('div');
                 scope.id = 'var-scope-' + item.variablesReference;
+                scope.setAttribute('evaluate-name', item.evaluateName);
                 scope.style.display = 'none';
                 scope.style.paddingLeft = '10px';
                 container.appendChild(scope);
@@ -299,12 +359,16 @@ class Context {
                         }
                         if (scope.childElementCount === 0) {
                             this.api.postMessage({ command: 'get-variable-scope', variable: item.variablesReference });
+                        } else {
+                            document.dispatchEvent(new CustomEvent("populated", { detail: { scope: scope }}));
                         }
                         event.stopPropagation();
                     }
                 });
             }
         });
+
+        document.dispatchEvent(new CustomEvent("populated", { detail: { scope: container }}));
     }
 }
 
@@ -338,6 +402,11 @@ class Context {
             case 'populate-scope': {
                 console.log('populate scope');
                 context.populateScope(message.scope);
+                break;
+            }
+            case 'expand-path': {
+                console.log('expand path');
+                context.expandPath(message.reference);
                 break;
             }
         }
