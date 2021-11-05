@@ -402,6 +402,15 @@ export class VariableReference extends ReferenceDataItem {
     getReference() : Reference {
         const reference = this.parent.getReference();
         if (reference) {
+            if (this.parent instanceof VariableReference) {
+                const chain = reference.chain ? [...reference.chain, reference.variable] : [reference.variable];
+                return {
+                    thread: reference.thread,
+                    frame: reference.frame,
+                    chain: chain.slice(0, FoldReference.longPathLength),
+                    variable: this.variable
+                };
+            }
             return { ...reference, variable: this.variable };
         }
         return { variable: this.variable };

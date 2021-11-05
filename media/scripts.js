@@ -33,24 +33,25 @@ class Frame {
 
         const frameCell = document.createElement("td");
         frameCell.className = 'frame';
-        frameCell.style.color = this.frame.value === '\u25B6' ? 'goldenrod' : undefined;
+        frameCell.style.color = this.frame.value === '\u25BA' ? 'goldenrod' : undefined;
         frameCell.setAttribute('title', this.frame.label);
         frameCell.setAttribute('tag', this.frame.tag);
-
-        const badge = document.createElement("div");
-        badge.id = 'frame-badge-' + this.id;
-        badge.textContent = this.frame.value;
-        badge.style.transform = 'rotate(0deg)';
-        badge.addEventListener('click', event => {
+        frameCell.id = 'frame-badge-' + this.id;
+        frameCell.textContent = this.frame.value;
+        frameCell.addEventListener('click', event => {
             if (!event.ctrlKey) {
-                if (badge.style.transform === 'rotate(90deg)') {
-                    badge.style.transform = 'rotate(0deg)';
+                if (frameCell.textContent === '\u25BC') {
+                    frameCell.textContent = '\u25BA';
+                } else if (frameCell.textContent === '\u25B9') {
+                    frameCell.textContent = '\u25BF';
+                } else if (frameCell.textContent === '\u25BA') {
+                    frameCell.textContent = '\u25BC';
                 } else {
-                    badge.style.transform = 'rotate(90deg)';
+                    frameCell.textContent = '\u25B9';
                 }
                 const scope = document.getElementById('frame-scope-' + this.id);
                 if (scope) {
-                    if (badge.style.transform === 'rotate(0deg)') {
+                    if (frameCell.textContent === '\u25BA' || frameCell.textContent === '\u25B9') {
                         scope.style.display = 'none';
                     } else {
                         scope.style.display = 'table-cell';
@@ -66,7 +67,6 @@ class Frame {
                 event.stopPropagation();
             }
         });
-        frameCell.appendChild(badge);
 
         const moduleCell = document.createElement("td");
         moduleCell.className = 'module';
@@ -252,16 +252,17 @@ class Context {
             throw new Error('element "' + badgeId + '" not found');
         }
 
-        if (badge.style.transform === 'rotate(0deg)') {
+        if (badge.textContent === '\u25BA' || badge.textContent === '\u25B9') {
             if (reference.chain || reference.variable) {
                 const callback = event => {
                     if (event.detail.scope.id === scopeId) {
                         this.expandPath(reference);
                         document.removeEventListener('populated', callback);
+                        clearTimeout(timeout);
                     }
                 };
                 document.addEventListener('populated', callback);
-                setTimeout(() => {
+                var timeout = setTimeout(() => {
                     document.removeEventListener('populated', callback);
                     console.log('expand timeout');
                 }, 2000);
@@ -281,10 +282,11 @@ class Context {
                         if (event.detail.scope.getAttribute('evaluate-name') === variable.evaluateName) {
                             this.expandPath(reference);
                             document.removeEventListener('populated', callback);
+                            clearTimeout(timeout);
                         }
                     };
                     document.addEventListener('populated', callback);
-                    setTimeout(() => {
+                    var timeout = setTimeout(() => {
                         document.removeEventListener('populated', callback);
                         console.log('expand timeout');
                     }, 2000);
