@@ -245,42 +245,19 @@ class Context {
     }
 
     expandPath(reference) {
-        const badgeId = 'frame-badge-' + reference.frame.id;
-        const scopeId = 'frame-scope-' + reference.frame.id;
-        const badge = document.getElementById(badgeId);
-        if (!badge) {
-            throw new Error('element "' + badgeId + '" not found');
-        }
-
-        if (badge.textContent === '\u25BA' || badge.textContent === '\u25B9') {
-            if (reference.chain || reference.variable) {
-                const callback = event => {
-                    if (event.detail.scope.id === scopeId) {
-                        this.expandPath(reference);
-                        document.removeEventListener('populated', callback);
-                        clearTimeout(timeout);
-                    }
-                };
-                document.addEventListener('populated', callback);
-                var timeout = setTimeout(() => {
-                    document.removeEventListener('populated', callback);
-                    console.log('expand timeout');
-                }, 2000);
+        if (reference.frame) {
+            const badgeId = 'frame-badge-' + reference.frame.id;
+            const badge = document.getElementById(badgeId);
+            if (!badge) {
+                throw new Error('element "' + badgeId + '" not found');
             }
-            return badge.click();
-        }
 
-        const scope = document.getElementById(scopeId);
-        if (reference.chain) {
-            for(const variable of reference.chain) {
-                const badge = scope.querySelector(`[evaluate-name="${variable.evaluateName}"]`);
-                if (!badge) {
-                    throw new Error('badge element "' + variable.evaluateName + '" not found');
-                }
-                if (badge.textContent === '+') {
+            if (badge.textContent === '\u25BA' || badge.textContent === '\u25B9') {
+                if (reference.chain || reference.variable) {
+                    const scopeId = 'frame-scope-' + reference.frame.id;
                     const callback = event => {
-                        if (event.detail.scope.getAttribute('evaluate-name') === variable.evaluateName) {
-                            this.expandPath(reference);
+                        if (event.detail.scope.id === scopeId) {
+                            this.expandPath({ chain: reference.chain, variable: reference.variable });
                             document.removeEventListener('populated', callback);
                             clearTimeout(timeout);
                         }
@@ -290,12 +267,42 @@ class Context {
                         document.removeEventListener('populated', callback);
                         console.log('expand timeout');
                     }, 2000);
-                    return badge.click();
+                }
+                return badge.click();
+            }
+        }
+
+        if (reference.chain) {
+            for(const variable of reference.chain) {
+                if (variable.variablesReference !== 0) {
+                    const badgeId = 'var-badge-' + variable.variablesReference;
+                    const badge = document.getElementById(badgeId);
+                    if (!badge) {
+                        throw new Error('element "' + badgeId + '" not found');
+                    }
+                    if (badge.textContent === '+') {
+                        const scopeId = 'var-scope-' + variable.variablesReference;
+                        const callback = event => {
+                            if (event.detail.scope.id === scopeId) {
+                                this.expandPath({ chain: reference.chain.slice(1), variable: reference.variable });
+                                document.removeEventListener('populated', callback);
+                                clearTimeout(timeout);
+                            }
+                        };
+                        document.addEventListener('populated', callback);
+                        var timeout = setTimeout(() => {
+                            document.removeEventListener('populated', callback);
+                            console.log('expand timeout');
+                        }, 2000);
+                        return badge.click();
+                    }
                 }
             };
         }
-        if (reference.variable) {
-            const badge = scope.querySelector(`[evaluate-name="${reference.variable.evaluateName}"]`);
+
+        if (reference.variable && reference.variable.variablesReference !== 0) {
+            const badgeId = 'var-badge-' + reference.variable.variablesReference;
+            const badge = document.getElementById(badgeId);
             if (badge && badge.textContent === '+') {
                 return badge.click();
             }
@@ -323,7 +330,7 @@ class Context {
     
             const badge = document.createElement('div');
             badge.className = 'var-badge';
-            badge.setAttribute('evaluate-name', item.evaluateName);
+            badge.id = 'var-badge-' + item.variablesReference;
             badge.innerHTML = item.variablesReference ? '+' : '&ensp;';
     
             const name = document.createElement('span');
@@ -345,7 +352,6 @@ class Context {
             if (item.variablesReference) {
                 const scope = document.createElement('div');
                 scope.id = 'var-scope-' + item.variablesReference;
-                scope.setAttribute('evaluate-name', item.evaluateName);
                 scope.style.display = 'none';
                 scope.style.paddingLeft = '10px';
                 container.appendChild(scope);
