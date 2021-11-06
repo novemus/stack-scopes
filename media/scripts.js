@@ -33,25 +33,17 @@ class Frame {
 
         const frameCell = document.createElement("td");
         frameCell.className = 'frame';
-        frameCell.style.color = this.frame.value === '\u25BA' ? 'goldenrod' : undefined;
+        frameCell.style.color = this.frame.value === 'top' ? 'goldenrod' : undefined;
         frameCell.setAttribute('title', this.frame.label);
         frameCell.setAttribute('tag', this.frame.tag);
         frameCell.id = 'frame-badge-' + this.id;
-        frameCell.textContent = this.frame.value;
+        frameCell.textContent = '\u1405';
         frameCell.addEventListener('click', event => {
             if (!event.ctrlKey) {
-                if (frameCell.textContent === '\u25BC') {
-                    frameCell.textContent = '\u25BA';
-                } else if (frameCell.textContent === '\u25B9') {
-                    frameCell.textContent = '\u25BF';
-                } else if (frameCell.textContent === '\u25BA') {
-                    frameCell.textContent = '\u25BC';
-                } else {
-                    frameCell.textContent = '\u25B9';
-                }
+                frameCell.textContent = frameCell.textContent === '\u1401' ? '\u1405' : '\u1401';
                 const scope = document.getElementById('frame-scope-' + this.id);
                 if (scope) {
-                    if (frameCell.textContent === '\u25BA' || frameCell.textContent === '\u25B9') {
+                    if (frameCell.textContent === '\u1405') {
                         scope.style.display = 'none';
                     } else {
                         scope.style.display = 'table-cell';
@@ -252,7 +244,7 @@ class Context {
                 throw new Error('element "' + badgeId + '" not found');
             }
 
-            if (badge.textContent === '\u25BA' || badge.textContent === '\u25B9') {
+            if (badge.textContent === '\u1405') {
                 if (reference.chain || reference.variable) {
                     const scopeId = 'frame-scope-' + reference.frame.id;
                     const callback = event => {

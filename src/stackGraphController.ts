@@ -178,7 +178,7 @@ export class StackGraphController implements StackSnapshotReviewer {
                 const frm = new Frame();
                 frm.id = frame.id;
 
-                frm.frame.value = snapshot.topThread === thread.id && frames[0] === frame ? '\u25BA' : '\u25B9';
+                frm.frame.value = snapshot.topThread === thread.id && frames[0] === frame ? 'top' : 'low';
                 frm.frame.label = '#' + frame.id;
                 frm.frame.tag = utils.makeFrameTag(frame.id);
 
