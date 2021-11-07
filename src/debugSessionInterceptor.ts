@@ -17,8 +17,8 @@ export function searchResultLimit(): number {
 
 export interface Progress {
     abort(): boolean;
-    done(portion: number): void;
-    yield(count: number): void;
+    yield(): void;
+    tried(): void;
 }
 
 export interface StackSnapshotReviewer {
@@ -195,21 +195,25 @@ export class StackSnapshot {
             public readonly frame: any;
             public readonly chain: any[] = [];
             public readonly variable: any;
-            constructor(thread?: any, frame?: any, chain?: any[], variable?: any) {
+            public readonly pointer: number = 0;
+            constructor(thread?: any, frame?: any, chain?: any[], variable?: any, pointer?: number) {
                 this.thread = thread;
                 this.frame = frame;
                 if (chain) {
                     this.chain = chain;
                 }
                 this.variable = variable;
+                if (pointer) {
+                    this.pointer = pointer;
+                }
             }
-            public static addThread(reference: Reference, thread: any) : Reference {
+            public static addThread(reference: Reference, thread: any) : VariableReference {
                 return new VariableReference(thread, reference.frame, reference.chain?.slice(0, VariableReference.maxPathLength), reference.variable);
             }
-            public static addFrame(reference: Reference, frame: any) : Reference {
+            public static addFrame(reference: Reference, frame: any) : VariableReference {
                 return new VariableReference(reference.thread, frame, reference.chain?.slice(0, VariableReference.maxPathLength), reference.variable);
             }
-            public static addVariable(reference: Reference, variable: any) : Reference {
+            public static addVariable(reference: Reference, variable: any, pointer: number) : VariableReference {
                 if (reference.variable) {
                     let chain = reference.chain?.slice(0, VariableReference.maxPathLength);
                     if (!chain) {
@@ -217,13 +221,13 @@ export class StackSnapshot {
                     } else if (chain.length < VariableReference.maxPathLength) {
                         chain.push(reference.variable);
                     }
-                    return new VariableReference(reference.thread, reference.frame, chain, variable);
+                    return new VariableReference(reference.thread, reference.frame, chain, variable, pointer);
                 }
-                return new VariableReference(reference.thread, reference.frame, reference.chain?.slice(0, VariableReference.maxPathLength), variable);
+                return new VariableReference(reference.thread, reference.frame, reference.chain?.slice(0, VariableReference.maxPathLength), variable, pointer);
             }
         }
 
-        const search = async (pointer: number, depth: number, job: number, control: Progress, target: Reference): Promise<Reference[]> => {
+        const search = async (pointer: number, depth: number, job: number, control: Progress, target: VariableReference, exclude: Set<number>): Promise<Reference[]> => {
             let references: Reference[] = [];
             if (!control.abort()) {
                 if (!target.thread) {
@@ -232,7 +236,7 @@ export class StackSnapshot {
                         if (control.abort()) {
                             break;
                         }
-                        const places = await search(pointer, depth, job / threads.length, control, VariableReference.addThread(target, thread));
+                        const places = await search(pointer, depth, job / threads.length, control, VariableReference.addThread(target, thread), new Set<number>(exclude));
                         if (places.length > 0) {
                             references = [...references, ...places];
                         }
@@ -243,7 +247,7 @@ export class StackSnapshot {
                         if (control.abort()) {
                             break;
                         }
-                        const places = await search(pointer, depth - 1, job / frames.length, control, VariableReference.addFrame(target, frame));
+                        const places = await search(pointer, depth - 1, job / frames.length, control, VariableReference.addFrame(target, frame), new Set<number>(exclude));
                         if (places.length > 0) {
                             references = [...references, ...places];
                         }
@@ -257,7 +261,7 @@ export class StackSnapshot {
                             if (control.abort()) {
                                 break;
                             }
-    
+
                             let ptr = 0;
                             if (variable.memoryReference !== undefined && parseInt(variable.variablesReference) !== 0) {
                                 ptr = parseInt(variable.memoryReference);
@@ -271,23 +275,27 @@ export class StackSnapshot {
                             }
     
                             if (ptr === pointer) {
-                                references.push(VariableReference.addVariable(target, variable));
-                                control.yield(1);
-                            } else if (depth > 0 && variable.variablesReference !== 0 && ptr !== 0) {
-                                const places = await search(pointer, depth - 1, job / variables.length, control, VariableReference.addVariable(target, variable));
+                                references.push(VariableReference.addVariable(target, variable, ptr));
+                                control.yield();
+                            } else if (depth > 0 && variable.variablesReference !== 0 && ptr !== 0 && !exclude.has(ptr)) {
+                                const verified: Set<number> = new Set<number>(exclude);
+                                if (target.pointer !== ptr) {
+                                    verified.add(target.pointer);
+                                }
+                                const places = await search(pointer, depth - 1, job / variables.length, control, VariableReference.addVariable(target, variable, ptr), verified);
                                 if (places.length > 0) {
                                     references = [...references, ...places];
                                 }
                             }
+                            control.tried();
                         }
                     }
                 }
             }
-            control.done(job);
             return references;
         };
 
-        return search(pointer, depth, 100.0, progress, target ? target : new VariableReference());
+        return search(pointer, depth, 100.0, progress, new VariableReference(target?.thread, target?.frame, target?.chain, target?.variable), new Set<number>());
     }
 }
 

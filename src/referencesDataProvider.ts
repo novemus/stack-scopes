@@ -98,7 +98,7 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
                 const { memoryReference } = await snapshot.evaluateExpression(info.getFrameId(), '(void*)&(' + variable.evaluateName + '),x');
                 if (memoryReference === undefined) {
                     return vscode.window.showWarningMessage(
-                        `Could not evaluate memory reference for expression '${variable.evaluateName}' with type '${variable.type}'.`
+                        `Could not evaluate memory reference for a variable expressed as '${variable.evaluateName}' with type '${variable.type}'.`
                         );
                 }
                 pointer = memoryReference;
@@ -107,24 +107,24 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
 
             vscode.window.withProgress({
                 location: vscode.ProgressLocation.Window,
-                title: 'Search References',
+                title: 'Search references for ' + pointer,
                 cancellable: true
             }, async (progress, token) => {
 
                 const limit: number = searchResultLimit();
-                let stage: number = 0;
+                let passed: number = 0;
                 let found: number = 0;
 
                 const references = await snapshot.searchReferences(parseInt(pointer), depth, {
                     abort: () => {
                         return token.isCancellationRequested || found >= limit; 
                     },
-                    done: (part: number) => {
-                        stage = Math.round(Math.min(stage + part, 100));
-                        progress.report({ increment: stage, message: stage + '%' });
+                    tried: () => {
+                        ++passed;
+                        progress.report({ increment: passed, message: `Found ${found} references out of ${passed} verified.` });
                     },
-                    yield: (count: number) => {
-                        found += count;
+                    yield: () => {
+                        ++found;
                     }
                 });
 

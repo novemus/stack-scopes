@@ -260,7 +260,7 @@ export class VariableScope extends ScopeDataItem implements VariableInfo {
                 try {
                     const items: ScopeDataItem[] = [];
                     const variables = await this.getSnapshot().getVariables(this.variable.variablesReference) || [];
-                    if (this.variable.type.match(/^.*\*\s*(const)?\s*$/) && variables.length === 1 && variables[0].memoryReference) {
+                    if (this.variable.type.match(/^.*\*\s*(const)?\s*$/) && variables.length === 1 && this.variable.type !== variables[0].type && this.variable.type.startsWith(variables[0].type)) {
                         const variable = { ...variables[0] };
                         variable.name = '';
                         items.push(new VariableScope(variable, this.frame, this));
