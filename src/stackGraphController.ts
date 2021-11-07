@@ -238,6 +238,7 @@ export class StackGraphController implements StackSnapshotReviewer {
                 </head>
                 <body>
                     <div id="container" class="container"></div>
+                    <div id="context-menu" class="context-menu">Search for References</div>
                     <script nonce="${nonce}" src="${scripstUri}"></script>
                 </body>
             </html>`;

@@ -70,7 +70,7 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
         const session = this._sessions.get(snapshot.id);
         if (session) {
             const input = await vscode.window.showInputBox({
-                placeHolder: 'Specify the search depth. 1 - search only in frame scopes.',
+                placeHolder: 'Search for references. Specify the frame passage depth, 1 - without diving in variables.',
                 validateInput: text => {
                     if (text.length === 0) {
                         return 'type a number more than 0';

@@ -4,6 +4,16 @@ html, body {
 .container {
     font-size: 95%;
 }
+.context-menu {
+    display: none;
+    position: absolute;
+    text-align: center;
+    border: 1px solid var(--vscode-editorIndentGuide-background);
+    background: var(--vscode-editor-background);
+    padding: 5px;
+    font-size: 95%;
+    cursor: pointer;
+}
 .block {
     display: inline-block;
     vertical-align: bottom;
@@ -26,20 +36,20 @@ table.stack td:nth-of-type(4) {width: 20px;}
 .thread {
     caption-side: bottom;
 }
-.line {
+.frame-line {
     cursor: pointer;
     white-space: nowrap;
     text-overflow: ellipsis;
     overflow: hidden;
-}
-.line:hover {
-    background: var(--vscode-editorHoverWidget-background);
 }
 .frame {
     white-space: nowrap;
     text-align: center;
     vertical-align: middle;
     user-select: none;
+}
+.frame-scope {
+    display: none;
 }
 .module {
     white-space: nowrap;
@@ -65,6 +75,16 @@ table.stack td:nth-of-type(4) {width: 20px;}
     user-select: none;
     vertical-align: middle;
 }
+.var-scope {
+    display: none;
+    padding-left: 10px;
+}
+.var-line {
+    cursor: pointer;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
 .var-badge {
     display: inline-block;
     width: 20px;
@@ -78,4 +98,7 @@ table.stack td:nth-of-type(4) {width: 20px;}
 .var-value {
     padding-left: 10px;
     color: var(--vscode-debugTokenExpression-value);
+}
+.var-line:hover, .frame-line:hover, .context-menu:hover {
+    background: var(--vscode-editorHoverWidget-background);
 }

@@ -12,11 +12,9 @@ class Frame {
 
     createFrameDomElement() {
         const line = document.createElement('tr');
-        line.className = 'line';
+        line.className = 'frame-line';
         line.addEventListener('click', event => {
-            if(!event.ctrlKey) {
-                this.api.postMessage({ command: 'select', frame: this.id });
-            } else {
+            if (event.ctrlKey || event.buttons === 2) {
                 const elements = document.querySelectorAll('[tag=' + event.target.getAttribute('tag') + ']');
                 if (event.target.style.backgroundColor === '') {
                     const color = '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0');
@@ -28,6 +26,8 @@ class Frame {
                         element.style.backgroundColor = '';
                     });
                 }
+            } else {
+                this.api.postMessage({ command: 'select', frame: this.id });
             }
         });
 
@@ -90,8 +90,9 @@ class Frame {
         const row = document.createElement('tr');
         const cell = document.createElement('td');
         cell.id = 'frame-scope-' + this.id;
+        cell.className = 'frame-scope';
         cell.setAttribute('colspan', 4);
-        cell.style.display = 'none';
+        cell.setAttribute('frame-id', this.id);
 
         row.appendChild(cell);
 
@@ -135,9 +136,40 @@ class Context {
         this.stacks = [];
         this.drawAll = true;
 
+        const menu = document.getElementById("context-menu");
+        menu.addEventListener('click', event => {
+            menu.style.display = 'none';
+        });
+
         document.addEventListener('click', event => {
             if(event.ctrlKey && !this.drawAll) {
                 this.showColorized();
+            }
+            menu.style.display = 'none';
+        });
+
+        document.addEventListener('contextmenu', event => {
+            event.preventDefault();
+            if (event.target === menu || event.target.className === 'var-line' || event.target.parentNode.className === 'var-line') {
+                if (menu.style.display === 'block') {
+                    menu.style.display = 'none';
+                } else {
+                    const evaluateName = event.target.getAttribute('evaluate-name') || event.target.parentNode.getAttribute('evaluate-name');
+                    if (evaluateName) {
+                        let parent = event.target.parentNode;
+                        while(parent && parent.className !== 'frame-scope') {
+                            parent = parent.parentNode;
+                        }
+                        const frameId = parent?.getAttribute('frame-id');
+                        if (frameId) {
+                            menu.setAttribute('evaluate-name', evaluateName);
+                            menu.setAttribute('frame-id', frameId);
+                            menu.style.left = event.pageX + "px";
+                            menu.style.top = event.pageY + "px";
+                            menu.style.display = 'block';
+                        }
+                    }
+                }
             }
         });
     }
@@ -318,8 +350,9 @@ class Context {
 
         data.variables.forEach(item => {
             const variable = document.createElement('div');
-            variable.className = 'line';
-    
+            variable.className = 'var-line';
+            variable.setAttribute('evaluate-name', item.evaluateName);
+
             const badge = document.createElement('div');
             badge.className = 'var-badge';
             badge.id = 'var-badge-' + item.variablesReference;
@@ -338,14 +371,14 @@ class Context {
             variable.appendChild(badge);
             variable.appendChild(name);
             variable.appendChild(value);
-    
             container.appendChild(variable);
 
             if (item.variablesReference) {
                 const scope = document.createElement('div');
                 scope.id = 'var-scope-' + item.variablesReference;
-                scope.style.display = 'none';
-                scope.style.paddingLeft = '10px';
+                scope.className = 'var-scope';
+                scope.setAttribute('variable', this.variablesReference);
+
                 container.appendChild(scope);
 
                 badge.addEventListener('click', event => {
