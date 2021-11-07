@@ -1,5 +1,3 @@
-const NORMAL_BACKGROUND = 'var(--vscode-editor-background)';
-
 class Frame {
     constructor(api, id, frame, module, func, obj) {
         this.api = api;
@@ -39,7 +37,7 @@ class Frame {
         frameCell.id = 'frame-badge-' + this.id;
         frameCell.textContent = '\u1405';
         frameCell.addEventListener('click', event => {
-            if (!event.ctrlKey) {
+            if (!event.ctrlKey && event.buttons === 0) {
                 frameCell.textContent = frameCell.textContent === '\u1401' ? '\u1405' : '\u1401';
                 const scope = document.getElementById('frame-scope-' + this.id);
                 if (scope) {
@@ -155,7 +153,7 @@ class Context {
 
         document.addEventListener('contextmenu', event => {
             event.preventDefault();
-            if (event.target === menu || event.target.className === 'var-line' || event.target.parentNode.className === 'var-line') {
+            if (event.target.className === 'var-line' || event.target.parentNode.className === 'var-line') {
                 if (menu.style.display === 'block') {
                     menu.style.display = 'none';
                 } else {
