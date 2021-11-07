@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as utils from './utils';
-import { StackSnapshotReviewer, StackSnapshot } from './debugSessionInterceptor';
+import { VariableInfo, StackSnapshot, StackSnapshotReviewer } from './debugSessionInterceptor';
 
 export class StackScopesDataProvider implements vscode.TreeDataProvider<ScopeDataItem>, StackSnapshotReviewer {
     private _sessions: Map<string, DebugSessionScope> = new Map<string, DebugSessionScope>();
@@ -245,7 +245,7 @@ export class FrameScope extends ScopeDataItem {
     }
 }
 
-export class VariableScope extends ScopeDataItem {
+export class VariableScope extends ScopeDataItem implements VariableInfo {
     private evaluate: number = 0;
     private children: vscode.ProviderResult<ScopeDataItem[]>;
     constructor(public readonly variable: any, public readonly frame: any, public readonly parent: ScopeDataItem) { 
@@ -296,6 +296,12 @@ export class VariableScope extends ScopeDataItem {
     evaluateNextElement() {
         this.evaluate = this.evaluate + 1;
         this.children = undefined;
+    }
+    getFrameId() : number {
+        return this.frame.id;
+    }
+    getVariable() : any {
+        return this.variable;
     }
 }
 

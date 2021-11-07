@@ -1,9 +1,7 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import * as utils from './utils';
 import { Reference, longReferencePath, shortReferencePath, searchResultLimit } from './debugSessionInterceptor';
-import { StackSnapshot, StackSnapshotReviewer } from './debugSessionInterceptor';
-import { ScopeDataItem, VariableScope } from './stackScopesDataProvider';
+import { VariableInfo, StackSnapshot, StackSnapshotReviewer } from './debugSessionInterceptor';
 
 export class ReferencesDataProvider implements vscode.TreeDataProvider<ReferenceDataItem>, StackSnapshotReviewer {
     private _sessions: Map<string, DebugSessionReference> = new Map<string, DebugSessionReference>();
@@ -11,10 +9,8 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
     readonly onDidChangeTreeData: vscode.Event<ReferenceDataItem | undefined | null | void> = this._onDidChangeTreeData.event;
     constructor(context: vscode.ExtensionContext) {
         context.subscriptions.push(
-            vscode.commands.registerCommand('stackScopes.searchReferences', (item: ScopeDataItem) => {
-                if (item instanceof VariableScope) {
-                    this.makeBunchForVariable(item as VariableScope);
-                }
+            vscode.commands.registerCommand('stackScopes.searchReferences', (info: VariableInfo) => {
+                this.makeBunchForVariable(info);
             })
         );
         context.subscriptions.push(
@@ -65,10 +61,12 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
 
         return Promise.resolve([...this._sessions.values()]);
     }
-    async makeBunchForVariable(scope: VariableScope) {
-        const snapshot = scope.getSnapshot();
-        const session = this._sessions.get(snapshot.id);
-        if (session) {
+    async makeBunchForVariable(info: VariableInfo) {
+        const snapshot = info.getSnapshot();
+        const variable = info.getVariable();
+
+        if (snapshot && variable && this._sessions.has(snapshot.id)) {
+            const session = this._sessions.get(snapshot.id) as DebugSessionReference;
             const input = await vscode.window.showInputBox({
                 placeHolder: 'Search for references. Specify the frame passage depth, 1 - without diving in variables.',
                 validateInput: text => {
@@ -90,14 +88,19 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
             }
 
             let pointer = '';
-            if (scope.variable.memoryReference !== undefined && parseInt(scope.variable.variablesReference) !== 0) {
-                pointer = scope.variable.memoryReference;
-            } else if (scope.variable.memoryReference !== undefined && scope.variable.value?.match(/^(0x[0-9A-Fa-f]+).*$/)) {
-                if (parseInt(scope.variable.memoryReference) === parseInt(scope.variable.value.match(/^(0x[0-9A-Fa-f]+).*$/)[1])) {
-                    pointer = scope.variable.memoryReference;
+            if (variable.memoryReference !== undefined && parseInt(variable.variablesReference) !== 0) {
+                pointer = variable.memoryReference;
+            } else if (variable.memoryReference !== undefined && variable.value?.match(/^(0x[0-9A-Fa-f]+).*$/)) {
+                if (parseInt(variable.memoryReference) === parseInt(variable.value.match(/^(0x[0-9A-Fa-f]+).*$/)[1])) {
+                    pointer = variable.memoryReference;
                 }
             } else {
-                const { memoryReference } = await snapshot.evaluateExpression(scope.frame.id, '(void*)&(' + scope.variable.evaluateName + '),x');
+                const { memoryReference } = await snapshot.evaluateExpression(info.getFrameId(), '(void*)&(' + variable.evaluateName + '),x');
+                if (memoryReference === undefined) {
+                    return vscode.window.showWarningMessage(
+                        `Could not evaluate memory reference for expression '${variable.evaluateName}' with type '${variable.type}'.`
+                        );
+                }
                 pointer = memoryReference;
             }
             const name = 'pointer=' + pointer + ' depth=' + depth;

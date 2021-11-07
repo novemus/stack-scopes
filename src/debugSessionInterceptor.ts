@@ -26,6 +26,12 @@ export interface StackSnapshotReviewer {
     onSnapshotRemoved(snapshot: StackSnapshot): void;
 }
 
+export interface VariableInfo {
+    getFrameId() : number;
+    getVariable() : any;
+    getSnapshot() : StackSnapshot;
+}
+
 export interface Reference {
     readonly thread?: any;
     readonly frame?: any;
@@ -217,7 +223,7 @@ export class StackSnapshot {
             }
         }
 
-        const search = async (pointer: number, depth: number, job: number, control: Progress, target: Reference, exclude: Set<number>): Promise<Reference[]> => {
+        const search = async (pointer: number, depth: number, job: number, control: Progress, target: Reference): Promise<Reference[]> => {
             let references: Reference[] = [];
             if (!control.abort()) {
                 if (!target.thread) {
@@ -226,7 +232,7 @@ export class StackSnapshot {
                         if (control.abort()) {
                             break;
                         }
-                        const places = await search(pointer, depth, job / threads.length, control, VariableReference.addThread(target, thread), new Set<number>(exclude));
+                        const places = await search(pointer, depth, job / threads.length, control, VariableReference.addThread(target, thread));
                         if (places.length > 0) {
                             references = [...references, ...places];
                         }
@@ -237,7 +243,7 @@ export class StackSnapshot {
                         if (control.abort()) {
                             break;
                         }
-                        const places = await search(pointer, depth - 1, job / frames.length, control, VariableReference.addFrame(target, frame), new Set<number>(exclude));
+                        const places = await search(pointer, depth - 1, job / frames.length, control, VariableReference.addFrame(target, frame));
                         if (places.length > 0) {
                             references = [...references, ...places];
                         }
@@ -267,10 +273,8 @@ export class StackSnapshot {
                             if (ptr === pointer) {
                                 references.push(VariableReference.addVariable(target, variable));
                                 control.yield(1);
-                            } else if (depth > 0 && variable.variablesReference !== 0 && ptr !== 0 && !exclude.has(ptr)) {
-                                const verified: Set<number> = new Set<number>(exclude);
-                                verified.add(ptr);
-                                const places = await search(pointer, depth - 1, job / variables.length, control, VariableReference.addVariable(target, variable), verified);
+                            } else if (depth > 0 && variable.variablesReference !== 0 && ptr !== 0) {
+                                const places = await search(pointer, depth - 1, job / variables.length, control, VariableReference.addVariable(target, variable));
                                 if (places.length > 0) {
                                     references = [...references, ...places];
                                 }
@@ -283,7 +287,7 @@ export class StackSnapshot {
             return references;
         };
 
-        return search(pointer, depth, 100.0, progress, target ? target : new VariableReference(), new Set<number>());
+        return search(pointer, depth, 100.0, progress, target ? target : new VariableReference());
     }
 }
 

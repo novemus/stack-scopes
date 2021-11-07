@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as utils from './utils';
-import { StackSnapshotReviewer, StackSnapshot, Reference } from './debugSessionInterceptor';
+import { StackSnapshotReviewer, StackSnapshot, Reference, VariableInfo } from './debugSessionInterceptor';
 
 class Section {
     public label: string | undefined = '';
@@ -154,6 +154,22 @@ export class StackGraphController implements StackSnapshotReviewer {
                                     variables: await snapshot.getVariables(message.variable)
                                 }
                             });
+                            break;
+                        }
+                    case 'search-references':
+                        {
+                            const info: VariableInfo = {
+                                getSnapshot() : StackSnapshot {
+                                    return snapshot;
+                                },
+                                getFrameId() : number {
+                                    return message.frame;
+                                },
+                                getVariable() : any {
+                                    return message.variable;
+                                }
+                            };
+                            vscode.commands.executeCommand('stackScopes.searchReferences', info);
                             break;
                         }
                 }

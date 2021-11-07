@@ -92,7 +92,7 @@ class Frame {
         cell.id = 'frame-scope-' + this.id;
         cell.className = 'frame-scope';
         cell.setAttribute('colspan', 4);
-        cell.setAttribute('frame-id', this.id);
+        cell.userData = { frameId: this.id };
 
         row.appendChild(cell);
 
@@ -139,6 +139,11 @@ class Context {
         const menu = document.getElementById("context-menu");
         menu.addEventListener('click', event => {
             menu.style.display = 'none';
+            this.api.postMessage({
+                command: 'search-references',
+                frame: menu.userData.frameId,
+                variable: menu.userData.variable
+            });
         });
 
         document.addEventListener('click', event => {
@@ -154,16 +159,15 @@ class Context {
                 if (menu.style.display === 'block') {
                     menu.style.display = 'none';
                 } else {
-                    const evaluateName = event.target.getAttribute('evaluate-name') || event.target.parentNode.getAttribute('evaluate-name');
-                    if (evaluateName) {
+                    const { variable } = event.target.userData || event.target.parentNode.userData;
+                    if (variable) {
                         let parent = event.target.parentNode;
                         while(parent && parent.className !== 'frame-scope') {
                             parent = parent.parentNode;
                         }
-                        const frameId = parent?.getAttribute('frame-id');
+                        const { frameId } = parent?.userData;
                         if (frameId) {
-                            menu.setAttribute('evaluate-name', evaluateName);
-                            menu.setAttribute('frame-id', frameId);
+                            menu.userData = { frameId, variable };
                             menu.style.left = event.pageX + "px";
                             menu.style.top = event.pageY + "px";
                             menu.style.display = 'block';
@@ -351,7 +355,7 @@ class Context {
         data.variables.forEach(item => {
             const variable = document.createElement('div');
             variable.className = 'var-line';
-            variable.setAttribute('evaluate-name', item.evaluateName);
+            variable.userData = { variable: item };
 
             const badge = document.createElement('div');
             badge.className = 'var-badge';
@@ -377,7 +381,7 @@ class Context {
                 const scope = document.createElement('div');
                 scope.id = 'var-scope-' + item.variablesReference;
                 scope.className = 'var-scope';
-                scope.setAttribute('variable', this.variablesReference);
+                scope.setAttribute('variable', item.variablesReference);
 
                 container.appendChild(scope);
 
