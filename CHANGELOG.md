@@ -20,6 +20,6 @@
 
 - Ability to resize stack table columns.
 
-## 1.3.0 (November 8, 2021)
+## 1.3.0 (November 9, 2021)
 
 - Search for references to variables.
