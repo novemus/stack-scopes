@@ -9,6 +9,7 @@ The `stack-scopes` is extension for [Visual Studio Code](https://code.visualstud
 * [Inspect](#unfold-frame-context) any number of frame contexts.
 * [Reveal](#reveal-reference-code) reference source code.
 * [Evaluate](#evaluate-dynamic-arrays-elements) elements of dynamically allocated arrays.
+* [Search](#search-for-references-to-variabes) for references to variables.
 
 ## Scopes view ##
 
@@ -39,6 +40,12 @@ Both the `Scopes` view and the `Stack Graph` window support revealing reference 
 By default, you see only first element of the dynamically allocated arrays in the scope tree, because the debugger does not know the size of the array. You can evaluate following possible elements of the array variable under its tree item.
 
 ![Evaluate](https://raw.githubusercontent.com/novemus/stack-scopes/master/resources/evaluate.gif)
+
+## Search for references to variables ##
+
+You can search for references to any variable in the frame scopes, as well as inside other variables accessible from stack frames. The search results depend on the quality of the debugging information and also on how the variables are [represented](https://code.visualstudio.com/docs/cpp/natvis) by the debugging adapter. Also, the search is not performed in manually [evaluated](#evaluate-dynamic-arrays-elements) variables.
+
+![Search](https://raw.githubusercontent.com/novemus/stack-scopes/master/resources/search.gif)
 
 ## Requirements
 

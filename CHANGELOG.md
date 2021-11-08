@@ -12,6 +12,6 @@
 
 - Evaluate elements of dynamically allocated arrays.
 
-## 1.3.0 (November 4, 2021)
+## 1.3.0 (November 8, 2021)
 
 - Search for references to variables.
