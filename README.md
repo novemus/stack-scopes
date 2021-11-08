@@ -19,7 +19,7 @@ The `Scopes` view represents stack frames grouped by locations of their scopes. 
 
 ## Stack Graph ##
 
-The main purpose of the `Stack Graph` window is to provide a possibility to analyze stacks for mutual use of modules, functions and even objects. For this you can apply color highlighting to elements you are interested in. Just click desired element in the graph with the `ctrl` key pressed or click appropriate icon on an item of the `Scopes` tree view. Click again to cancel the highlighting of the element.
+The main purpose of the `Stack Graph` window is to provide a possibility to analyze stacks for mutual use of modules, functions and even objects. For this you can apply color highlighting to elements you are interested in. Just press the `ctrl` key or the right mouse button and click the desired item on the stack graph. Also you can click appropriate icon on an item of the `Scopes` or `References` tree view. Click again to cancel the highlighting of the element.
 
 ![Graph](https://raw.githubusercontent.com/novemus/stack-scopes/master/resources/graph.gif)
 

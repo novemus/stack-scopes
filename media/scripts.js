@@ -25,7 +25,9 @@ class Frame {
                     });
                 }
             } else {
-                this.api.postMessage({ command: 'select', frame: this.id });
+                if (event.target.className !== 'resizer') {
+                    this.api.postMessage({ command: 'select', frame: this.id });
+                }
             }
         });
 
@@ -64,11 +66,19 @@ class Frame {
         moduleCell.setAttribute('tag', this.module.tag);
         moduleCell.textContent = this.module.value;
 
+        const moduleResizer = document.createElement("td");
+        moduleResizer.className = 'resizer';
+        moduleResizer.setAttribute('tag', this.module.tag);
+
         const funcCell = document.createElement("td");
         funcCell.className = 'function';
         funcCell.setAttribute('title', this.func.label);
         funcCell.setAttribute('tag', this.func.tag);
         funcCell.textContent = this.func.value;
+
+        const funcResizer = document.createElement("td");
+        funcResizer.className = 'resizer';
+        funcResizer.setAttribute('tag', this.func.tag);
 
         const objCell = document.createElement("td");
         objCell.className = 'object';
@@ -78,8 +88,43 @@ class Frame {
 
         line.appendChild(frameCell);
         line.appendChild(moduleCell);
+        line.appendChild(moduleResizer);
         line.appendChild(funcCell);
+        line.appendChild(funcResizer);
         line.appendChild(objCell);
+
+        let startX = 0;
+        let startWidth = 0;
+        let cell = null;
+
+        const onMouseMove = event => {
+            cell.style.width = (startWidth + event.clientX - startX) + 'px';
+            event.stopPropagation();
+        };
+
+        const onMouseUp = event => {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            event.stopPropagation();
+        };
+
+        moduleResizer.addEventListener('mousedown', event => {
+            cell = moduleCell.parentElement.parentElement.firstChild.nextSibling.firstChild.nextSibling;
+            startX = event.clientX;
+            startWidth = parseInt(document.defaultView.getComputedStyle(cell).width, 10);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+            event.stopPropagation();
+        });
+
+        funcResizer.addEventListener('mousedown', event => {
+            cell = funcCell.parentElement.parentElement.firstChild.nextSibling.firstChild.nextSibling.nextSibling.nextSibling;
+            startX = event.clientX;
+            startWidth = parseInt(document.defaultView.getComputedStyle(cell).width, 10);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+            event.stopPropagation();
+        });
 
         return line;
     }
@@ -89,7 +134,7 @@ class Frame {
         const cell = document.createElement('td');
         cell.id = 'frame-scope-' + this.id;
         cell.className = 'frame-scope';
-        cell.setAttribute('colspan', 4);
+        cell.setAttribute('colspan', 6);
         cell.userData = { frameId: this.id };
 
         row.appendChild(cell);

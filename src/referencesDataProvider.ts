@@ -87,22 +87,25 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
                 return;
             }
 
-            let pointer = '';
+            let pointer : string | undefined;
             if (variable.memoryReference !== undefined && parseInt(variable.variablesReference) !== 0) {
                 pointer = variable.memoryReference;
             } else if (variable.memoryReference !== undefined && variable.value?.match(/^(0x[0-9A-Fa-f]+).*$/)) {
                 if (parseInt(variable.memoryReference) === parseInt(variable.value.match(/^(0x[0-9A-Fa-f]+).*$/)[1])) {
                     pointer = variable.memoryReference;
                 }
-            } else {
+            } else if (variable.evaluateName) {
                 const { memoryReference } = await snapshot.evaluateExpression(info.getFrameId(), '(void*)&(' + variable.evaluateName + '),x');
-                if (memoryReference === undefined) {
-                    return vscode.window.showWarningMessage(
-                        `Could not evaluate memory reference for a variable expressed as '${variable.evaluateName}' with type '${variable.type}'.`
-                        );
-                }
                 pointer = memoryReference;
             }
+
+            if (pointer === undefined) {
+                vscode.window.showWarningMessage(
+                    `Could not evaluate memory reference for the variable '${variable.name}' expressed as '${variable.evaluateName}' with type '${variable.type}'.`
+                    );
+                return;
+            }
+
             const name = 'pointer=' + pointer + ' depth=' + depth;
 
             vscode.window.withProgress({
@@ -115,7 +118,7 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
                 let passed: number = 0;
                 let found: number = 0;
 
-                const references = await snapshot.searchReferences(parseInt(pointer), depth, {
+                const references = await snapshot.searchReferences(parseInt(pointer as string), depth, {
                     abort: () => {
                         return token.isCancellationRequested || found >= limit; 
                     },

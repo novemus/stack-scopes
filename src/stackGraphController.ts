@@ -206,11 +206,11 @@ export class StackGraphController implements StackSnapshotReviewer {
                 frm.func.label = frm.func.value;
                 frm.func.tag = utils.makeFunctionTag(frm.func.value, frame.source?.path);
 
-                const value = frame.name.match(/.+::.+/) ? await snapshot.getVariableValue(frame.id, 'this') : undefined;
-                if (value) {
+                const variabe = frame.name.match(/.+::.+/) ? await snapshot.getFrameVariable(frame.id, 'this') : undefined;
+                if (variabe?.memoryReference) {
                     frm.obj.value = '{...}';
-                    frm.obj.label = "this: " + value;
-                    frm.obj.tag = utils.makeObjectTag(value);
+                    frm.obj.label = "this: " + variabe.memoryReference;
+                    frm.obj.tag = utils.makeObjectTag(variabe.memoryReference);
                 } else {
                     frm.obj.value = '...';
                     frm.obj.tag = utils.makeVoidTag(frame.id);

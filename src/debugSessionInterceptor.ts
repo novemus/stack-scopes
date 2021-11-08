@@ -146,14 +146,14 @@ export class StackSnapshot {
         return this._variables.get(reference);
     }
 
-    async getVariableValue(frame: number, name: string): Promise<string | undefined> {
+    async getFrameVariable(frame: number, name: string): Promise<any | undefined> {
         const scopes = await this.getScopes(frame) || [];
         for(const scope of scopes) {
             if (scope.name === "Locals" || scope.presentationHint === 'locals') {
                 const variables = await this.getVariables(scope.variablesReference) || [];
                 for (const variable of variables) {
                     if (variable.name === name) {
-                        return variable.value;
+                        return variable;
                     }
                 }
             }
