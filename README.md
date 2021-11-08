@@ -9,7 +9,7 @@ The `stack-scopes` is extension for [Visual Studio Code](https://code.visualstud
 * [Inspect](#unfold-frame-context) any number of frame contexts.
 * [Reveal](#reveal-reference-code) reference source code.
 * [Evaluate](#evaluate-dynamic-arrays-elements) elements of dynamically allocated arrays.
-* [Search](#search-for-references-to-variabes) for references to variables.
+* [Search](#search-for-references-to-variables) for references to variables.
 
 ## Scopes view ##
 
