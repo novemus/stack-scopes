@@ -23,3 +23,7 @@
 ## 1.3.0 (November 9, 2021)
 
 - Search for references to variables.
+
+## 1.3.1 (November 10, 2021)
+
+- New extension logo.
