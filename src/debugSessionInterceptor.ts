@@ -39,6 +39,10 @@ export interface Reference {
     readonly chain?: any[];
 }
 
+export interface Filter {
+    readonly modules: number[];
+}
+
 export class StackSnapshot {
     public readonly id: string;
     public readonly name: string;
@@ -186,7 +190,7 @@ export class StackSnapshot {
         });
     }
 
-    searchReferences(pointer: number, depth: number, progress: Progress, target?: Reference): Promise<Reference[]> {
+    searchReferences(pointer: number, depth: number, progress: Progress, filter?: Filter, target?: Reference): Promise<Reference[]> {
         const snapshot = this;
 
         class VariableReference implements Reference {
@@ -246,6 +250,12 @@ export class StackSnapshot {
                     for(const frame of frames) {
                         if (control.abort()) {
                             break;
+                        }
+                        if (filter && filter.modules.length > 0) {
+                            const moduleId = frame.moduleId ? frame.moduleId as number : -1;
+                            if (filter.modules.find(id => id === moduleId) === undefined) {
+                                continue;
+                            }
                         }
                         const places = await search(pointer, depth - 1, job / frames.length, control, VariableReference.addFrame(target, frame), new Set<number>(exclude));
                         if (places.length > 0) {

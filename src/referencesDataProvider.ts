@@ -68,7 +68,8 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
         if (snapshot && variable && this._sessions.has(snapshot.id)) {
             const session = this._sessions.get(snapshot.id) as DebugSessionReference;
             const input = await vscode.window.showInputBox({
-                placeHolder: 'Search for references. Specify the frame passage depth, 1 - without diving in variables.',
+                title: 'Search for References',
+                placeHolder: 'Specify the frame passage depth, 1 - without diving in variables.',
                 validateInput: text => {
                     if (text.length === 0) {
                         return 'type a number more than 0';
@@ -84,6 +85,16 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
 
             const depth = parseInt(input as string);
             if (isNaN(depth)) {
+                return;
+            }
+
+            const modules = (await snapshot.modules() || []).map(m => { return { label: m.name, id: m.id, picked: true }; });
+            modules.push({ label: '<nameless>', id: -1, picked: true });
+            const filter = await vscode.window.showQuickPick(modules, {
+                title: 'Select Target Modules',
+                canPickMany: true
+            });
+            if (filter === undefined || filter.length === 0) {
                 return;
             }
 
@@ -106,7 +117,7 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
                 return;
             }
 
-            const name = 'pointer=' + pointer + ' depth=' + depth;
+            const name = 'pointer=' + pointer + ' depth=' + depth + ' modules=' + filter.map(m => m.label);
 
             vscode.window.withProgress({
                 location: vscode.ProgressLocation.Window,
@@ -129,7 +140,7 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
                     yield: () => {
                         ++found;
                     }
-                });
+                }, { modules: filter.map(m => m.id) });
 
                 if (found >= limit) {
                     vscode.window.showInformationMessage(`Found ${found} references. The limit of search results has been reached. You can change the limit in the extension settings, but do it with caution, as this will consume additional memory.`);
