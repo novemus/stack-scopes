@@ -88,9 +88,8 @@ export class ReferencesDataProvider implements vscode.TreeDataProvider<Reference
                 return;
             }
 
-            const modules = (await snapshot.modules() || []).map(m => { return { label: m.name, id: m.id, picked: true }; });
-            modules.push({ label: '<nameless>', id: -1, picked: true });
-            const filter = await vscode.window.showQuickPick(modules, {
+            const modules = await snapshot.getActualModules() || [];
+            const filter = await vscode.window.showQuickPick(modules.map(m => { return { label: m.name, id: m.id, picked: true }; }), {
                 title: 'Select Target Modules',
                 canPickMany: true
             });

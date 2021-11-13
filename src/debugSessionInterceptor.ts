@@ -114,6 +114,24 @@ export class StackSnapshot {
         return this._frames.get(thread);
     }
 
+    async getActualModules(): Promise<readonly any[] | undefined> {
+        const modules = await this.modules() || [];
+        const result: Map<number, any> = new Map<number, any>();
+        const threads = await this.threads() || [];
+        for(const thread of threads) {
+            const frames = await this.frames(thread.id) || [];
+            for(const frame of frames) {
+                const module = modules.find(m => m.id === frame.moduleId);
+                if (module !== undefined) {
+                    result.set(module.id, module);
+                } else {
+                    result.set(-1, { name: '', id: -1 });
+                }
+            }
+        }
+        return Array.from(result.values());
+    }
+
     async getScopes(frame: number): Promise<readonly any[] | undefined> {
         if (!this._scopes.has(frame)) {
             this._scopes.set(frame, new Promise(async (resolve, reject) => {

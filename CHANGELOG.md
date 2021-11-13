@@ -27,3 +27,7 @@
 ## 1.3.1 (November 10, 2021)
 
 - New extension logo.
+
+## 1.3.2 (November 13, 2021)
+
+- Ability to search in the specified modules.

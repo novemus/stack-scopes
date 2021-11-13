@@ -2,7 +2,7 @@
   "name": "stack-scopes",
   "displayName": "Stack Scopes",
   "description": "Analyzing C/C++ Stack Snapshots",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "publisher": "novemus",
   "author": {
     "name": "Novemus Band"
