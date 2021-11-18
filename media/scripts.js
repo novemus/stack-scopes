@@ -393,9 +393,15 @@ class Context {
         if (reference.variable && reference.variable.variablesReference !== 0) {
             const badgeId = 'var-badge-' + reference.variable.variablesReference;
             const badge = document.getElementById(badgeId);
+
+            const y = badge.getBoundingClientRect().y;
+            if (y < 0 || y > window.innerHeight) {
+                window.scrollBy(0, y);
+            }
+
             if (badge && badge.textContent === '+') {
                 return badge.click();
-            }
+            }     
         }
     }
 
