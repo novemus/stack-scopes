@@ -160,7 +160,21 @@ class Stack {
 
         const caption = document.createElement("caption");
         caption.className = 'thread';
-        caption.textContent = 'Thread #' + this.thread;
+
+        const label = document.createElement("span");
+        label.textContent = 'Thread #' + this.thread;
+        label.className = 'thread-badge';
+        label.addEventListener('click', event => {
+            if (event.ctrlKey || event.buttons === 2) {
+                if (table.style.borderColor !== 'var(--vscode-editorIndentGuide-background)' && table.style.borderColor !== '') {
+                    table.style.borderColor = 'var(--vscode-editorIndentGuide-background)';
+                } else {
+                    table.style.borderColor = '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0');
+                }
+            }
+        });
+
+        caption.appendChild(label);
         table.appendChild(caption);
 
         this.frames.forEach(frame => {
@@ -255,17 +269,22 @@ class Context {
         this.stacks.forEach(item => {
             const block = document.getElementById('block-' + item.thread);
             if (block) {
-                const tagged = block.querySelectorAll('[tag]');
-                const colorized = [...tagged].find(element => element.style.backgroundColor !== '');
-                if (!colorized) {
-                    block.style.display = 'none';
-                } else {
+                if (block.firstChild.style.borderColor !== 'var(--vscode-editorIndentGuide-background)' && block.firstChild.style.borderColor !== '') {
                     block.style.display = 'inline-block';
+                } else {
+                    const tagged = block.querySelectorAll('[tag]');
+                    const colorized = [...tagged].find(element => element.style.backgroundColor !== '');
+                    if (!colorized) {
+                        block.style.display = 'none';
+                    } else {
+                        block.style.display = 'inline-block';
+                    }
                 }
             } else {
                 throw new Error('element "block-' + item.thread + '" not found');
             }
         });
+
         this.drawAll = false;
     }
     

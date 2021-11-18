@@ -48,6 +48,9 @@ table.stack td:nth-of-type(6) { width: 20px; }
 .thread {
     caption-side: bottom;
 }
+.thread-badge {
+    cursor: pointer;
+}
 .frame-line {
     cursor: pointer;
     white-space: nowrap;
