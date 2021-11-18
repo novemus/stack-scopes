@@ -31,3 +31,7 @@
 ## 1.3.2 (November 13, 2021)
 
 - Ability to search in the specified modules.
+
+## 1.3.3 (November 18, 2021)
+
+- Ability to to highlight whole stack on graph.

@@ -10,6 +10,7 @@ The `stack-scopes` is extension for [Visual Studio Code](https://code.visualstud
 * [Reveal](#reveal-reference-code) reference source code.
 * [Evaluate](#evaluate-dynamic-arrays-elements) elements of dynamically allocated arrays.
 * [Search](#search-for-references-to-variables) for references to variables.
+* [Work](#graph-drawing-mode) only with the selected stacks on the graph.
 
 ## Scopes view ##
 
@@ -46,6 +47,12 @@ By default, you see only first element of the dynamically allocated arrays in th
 You can search for references to any variable in the frame scopes, as well as inside other variables accessible from stack frames. The search results depend on the quality of the debugging information and also on how the variables are [represented](https://code.visualstudio.com/docs/cpp/natvis) by the debugging adapter. Also, the search is not performed in manually [evaluated](#evaluate-dynamic-arrays-elements) variables.
 
 ![Search](https://raw.githubusercontent.com/novemus/stack-scopes/master/resources/search.gif)
+
+## Graph drawing mode ##
+
+It is possible to reduce the number of stacks on the graph. Just highlight some stacks and change the drawing mode by switching the toggle in the top right corner of the graph window.
+
+![Minimize](https://raw.githubusercontent.com/novemus/stack-scopes/master/resources/minimize.gif)
 
 ## Requirements
 
