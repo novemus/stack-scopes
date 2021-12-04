@@ -35,3 +35,7 @@
 ## 1.3.3 (November 18, 2021)
 
 - Ability to to highlight whole stack on graph.
+
+## 1.3.4 (December 4, 2021)
+
+- Fixed highlighting of `this` variables.
