@@ -288,7 +288,7 @@ export class VariableScope extends ScopeDataItem implements VariableInfo {
         return this.parent;
     }
     getTag() : string | undefined {
-        return this.variable.name === 'this' ? utils.makeObjectTag(this.variable.value) : undefined;
+        return this.variable.name === 'this' ? utils.makeObjectTag(this.variable.memoryReference) : undefined;
     }
     getSnapshot() : StackSnapshot {
         return this.parent.getSnapshot();

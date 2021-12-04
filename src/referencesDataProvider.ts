@@ -410,7 +410,7 @@ export class VariableReference extends ReferenceDataItem {
         return this.parent.getSnapshot();
     }
     getTag() : string | undefined {
-        return this.variable.name === 'this' ? utils.makeObjectTag(this.variable.value) : undefined;
+        return this.variable.name === 'this' ? utils.makeObjectTag(this.variable.memoryReference) : undefined;
     }
     getParent() : vscode.ProviderResult<ReferenceDataItem> {
         return this.parent;
