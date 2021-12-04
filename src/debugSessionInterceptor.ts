@@ -52,7 +52,7 @@ export class StackSnapshot {
     private _scopes: Map<number, Promise<readonly any[] | undefined>> = new Map<number, Promise<readonly any[] | undefined>>();
     private _variables: Map<number, Promise<readonly any[] | undefined>> = new Map<number, Promise<readonly any[] | undefined>>();
 
-    constructor(private readonly session: vscode.DebugSession, public readonly topThread: number) {
+    constructor(private readonly session: vscode.DebugSession, public readonly procName: string, public readonly procId: number, public readonly topThread: number) {
         this.id = session.id;
         this.name = session.name;
     }
@@ -330,6 +330,7 @@ export class StackSnapshot {
 export class DebugSessionInterceptor implements vscode.DebugAdapterTrackerFactory {
     private reviewers: Set<StackSnapshotReviewer> = new Set<StackSnapshotReviewer>();
     private sessions: Map<string, StackSnapshot> = new Map<string, StackSnapshot>();
+    private info: Map<string, [string, number]> = new Map<string, [string, number]>();
 
     constructor(context: vscode.ExtensionContext) {
         context.subscriptions.push(vscode.debug.registerDebugAdapterTrackerFactory('cppdbg', this));
@@ -339,8 +340,10 @@ export class DebugSessionInterceptor implements vscode.DebugAdapterTrackerFactor
     createDebugAdapterTracker(session: vscode.DebugSession): vscode.ProviderResult<vscode.DebugAdapterTracker> {
         return {
             onDidSendMessage: message => {
-                if (message.type === 'event' && message.event === 'stopped') {
-                    const snapshot = new StackSnapshot(session, message.body.threadId);
+                if (message.type === 'event' && message.event === 'process') {
+                    this.info.set(session.id, [message.body.name, message.body.systemProcessId]);
+                } else if (message.type === 'event' && message.event === 'stopped') {
+                    const snapshot = new StackSnapshot(session, this.info.get(session.id)?.[0] as string, this.info.get(session.id)?.[1] as number, message.body.threadId);
                     this.sessions.set(session.id, snapshot);
                     this.reviewers.forEach(r => r.onSnapshotCreated(snapshot));
                 } else if (message.type === 'response' && message.command === 'continue' || message.command === 'next' || message.command === 'stepIn' || message.command === 'stepOut') {
@@ -348,6 +351,7 @@ export class DebugSessionInterceptor implements vscode.DebugAdapterTrackerFactor
                     if (snapshot) {
                         this.reviewers.forEach(r => r.onSnapshotRemoved(snapshot));
                         this.sessions.delete(session.id);
+                        this.info.delete(session.id);
                     }
                 }
             },
