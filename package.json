@@ -111,6 +111,20 @@
         "icon": "$(screen-full)",
         "enablement": "inDebugMode && debugType == 'cppdbg' || debugType == 'cppvsdbg'",
         "category": "Stack Graph"
+      },
+      {
+        "command": "stackScopes.colorizeMatches",
+        "title": "Colorize Matches",
+        "icon": "$(color-mode)",
+        "enablement": "inDebugMode && debugType == 'cppdbg' || debugType == 'cppvsdbg'",
+        "category": "Stack Graph"
+      },
+      {
+        "command": "stackScopes.clearMatches",
+        "title": "Clear Matches",
+        "icon": "$(circle-slash)",
+        "enablement": "inDebugMode && debugType == 'cppdbg' || debugType == 'cppvsdbg'",
+        "category": "Stack Graph"
       }
     ],
     "menus": {
@@ -182,12 +196,22 @@
       "editor/title": [
         {
           "command": "stackScopes.drawOnlyColorizedStacks",
-          "when": "stackScopes.stackGraph && stackScopes.stackGraphMode == 'allStacks'",
+          "when": "stackScopes.stackGraph && !stackScopes.drawOnlyColorized",
           "group": "navigation"
         },
         {
           "command": "stackScopes.drawAllStacks",
-          "when": "stackScopes.stackGraph && stackScopes.stackGraphMode == 'colorizedStacks'",
+          "when": "stackScopes.stackGraph && stackScopes.drawOnlyColorized",
+          "group": "navigation"
+        },
+        {
+          "command": "stackScopes.colorizeMatches",
+          "when": "stackScopes.stackGraph && !stackScopes.colorizeMatches",
+          "group": "navigation"
+        },
+        {
+          "command": "stackScopes.clearMatches",
+          "when": "stackScopes.stackGraph && stackScopes.colorizeMatches",
           "group": "navigation"
         }
       ]

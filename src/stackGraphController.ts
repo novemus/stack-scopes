@@ -24,9 +24,9 @@ class Stack {
     }
 }
 
-enum DrawMode { 
-    allStacks = 'allStacks',
-    colorizedStacks = 'colorizedStacks'
+class DrawMode {
+    public drawOnlyColorized: boolean = false;
+    public colorizeMatches: boolean = false;
 }
 
 export class StackGraphController implements StackSnapshotReviewer {
@@ -72,12 +72,79 @@ export class StackGraphController implements StackSnapshotReviewer {
         }
     }
 
+    async colorizeMatchesForActiveGraph(snapshots: StackSnapshot[]) {
+        this.graphs.forEach(async (panel, id) => {
+            if (panel.active) {
+                const active = snapshots.find(s => s.id === id);
+                if (active) {
+                    const select = await vscode.window.showQuickPick(
+                        snapshots
+                            .filter(s => s.id !== active.id && s.procId === active.procId && s.procName === active.procName)
+                            .map(s => { return { label: s.name, snapshot: s }; }), {
+                        title: 'Compare With...'
+                    });
+                    const target = select?.snapshot;
+
+                    if (target !== undefined) {
+                        const matches = [] as object[];
+                        const threads = await active.threads() || [];
+                        for (const thread of threads) {
+                            const frames = await active.frames(thread.id);
+                            const samples = await target.frames(thread.id);
+                            if (frames !== undefined && samples !== undefined) {
+                                const match = {
+                                    thread: thread.id,
+                                    frames: [] as number[]
+                                };
+                                for (let i = 1; i <= frames.length && i <= samples.length; ++i) {
+                                    if (samples[samples.length - i].instructionPointerReference === frames[frames.length - i].instructionPointerReference) {
+                                        const frameObj = await active.getFrameVariable(frames[frames.length - i].id, 'this');
+                                        const sampleObj = await target.getFrameVariable(samples[samples.length - i].id, 'this');
+                                        if (frameObj && sampleObj && frameObj.memoryReference === sampleObj.memoryReference) {
+                                            match.frames.push(frames[frames.length - i].id);
+                                        } else if (frameObj === undefined && sampleObj === undefined) {
+                                            match.frames.push(frames[frames.length - i].id);
+                                        } else {
+                                            break;
+                                        }
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                matches.push(match);
+                            }
+                        };
+                        panel.webview.postMessage({ command: 'colorize-matches', matches });
+                        let mode = this.modes.get(panel) || new DrawMode();
+                        mode.colorizeMatches = true;
+                        this.modes.set(panel, mode);
+                        vscode.commands.executeCommand('setContext', 'stackScopes.colorizeMatches', mode.colorizeMatches);
+                    }
+                }
+            }
+        });
+    }
+
+    async clearMatchesForActiveGraph() {
+        this.graphs.forEach(panel => {
+            if (panel.active) {
+                panel.webview.postMessage({ command: 'clear-matches' });
+                let mode = this.modes.get(panel) || new DrawMode();
+                mode.colorizeMatches = false;
+                this.modes.set(panel, mode);
+                vscode.commands.executeCommand('setContext', 'stackScopes.colorizeMatches', mode.colorizeMatches);
+            }
+        });
+    }
+
     async drawAllStacksOnActiveGraph() {
         this.graphs.forEach(panel => {
             if (panel.active) {
-                this.modes.set(panel, DrawMode.allStacks);
+                let mode = this.modes.get(panel) || new DrawMode();
+                mode.drawOnlyColorized = false;
+                this.modes.set(panel, mode);
                 panel.webview.postMessage({ command: 'show-all' });
-                vscode.commands.executeCommand('setContext', 'stackScopes.stackGraphMode', DrawMode.allStacks);
+                vscode.commands.executeCommand('setContext', 'stackScopes.drawOnlyColorized', mode.drawOnlyColorized);
             }
         });
     }
@@ -85,9 +152,10 @@ export class StackGraphController implements StackSnapshotReviewer {
     async drawOnlyColorizedStacksOnActiveGraph() {
         this.graphs.forEach(panel => {
             if (panel.active) {
-                this.modes.set(panel, DrawMode.colorizedStacks);
+                let mode = this.modes.get(panel) || new DrawMode();
+                mode.drawOnlyColorized = true;
                 panel.webview.postMessage({ command: 'show-colorized' });
-                vscode.commands.executeCommand('setContext', 'stackScopes.stackGraphMode', DrawMode.colorizedStacks);
+                vscode.commands.executeCommand('setContext', 'stackScopes.drawOnlyColorized', mode.drawOnlyColorized);
             }
         });
     }
@@ -109,7 +177,7 @@ export class StackGraphController implements StackSnapshotReviewer {
         );
 
         this.graphs.set(snapshot.id, panel);
-        this.modes.set(panel, DrawMode.allStacks);
+        this.modes.set(panel, new DrawMode());
 
         panel.onDidDispose(() => {
             this.graphs.delete(snapshot.id);
@@ -176,8 +244,7 @@ export class StackGraphController implements StackSnapshotReviewer {
             }
         );
 
-        vscode.commands.executeCommand('setContext', 'stackScopes.stackGraph', true);
-        vscode.commands.executeCommand('setContext', 'stackScopes.stackGraphMode', this.modes.get(panel));
+        this.updateContext();
 
         panel.webview.postMessage({ command: 'populate', stacks: await this.buildStacks(snapshot) });
     }
@@ -225,13 +292,15 @@ export class StackGraphController implements StackSnapshotReviewer {
 
     private updateContext() {
         if (this.graphs.size === 0) {
-            vscode.commands.executeCommand('setContext', 'stackScopes.stackGraphFullMode', undefined);
+            vscode.commands.executeCommand('setContext', 'stackScopes.drawOnlyColorized', undefined);
+            vscode.commands.executeCommand('setContext', 'stackScopes.colorizeMatches', undefined);
             vscode.commands.executeCommand('setContext', 'stackScopes.stackGraph', undefined);
         } else {
             let active = false;
             this.graphs.forEach(panel => {
                 if (panel.active) {
-                    vscode.commands.executeCommand('setContext', 'stackScopes.stackGraphFullMode', this.modes.get(panel));
+                    vscode.commands.executeCommand('setContext', 'stackScopes.drawOnlyColorized', this.modes.get(panel)?.drawOnlyColorized);
+                    vscode.commands.executeCommand('setContext', 'stackScopes.colorizeMatches', this.modes.get(panel)?.colorizeMatches);
                 }
                 active = active || panel.active;
             });

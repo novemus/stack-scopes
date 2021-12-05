@@ -126,6 +126,19 @@ export function activate(context: vscode.ExtensionContext) {
             })
         );
         context.subscriptions.push(
+            vscode.commands.registerCommand('stackScopes.colorizeMatches', () => {
+                const snapshots = sessionInterceptor.getSnapshots();
+                if (snapshots) {
+                    stackGraphController.colorizeMatchesForActiveGraph(snapshots);
+                }
+            })
+        );
+        context.subscriptions.push(
+            vscode.commands.registerCommand('stackScopes.clearMatches', () => {
+                stackGraphController.clearMatchesForActiveGraph();
+            })
+        );
+        context.subscriptions.push(
             vscode.commands.registerCommand('stackScopes.revealFrameScopeTreeItem', (snapshot: string, frame: number, openSource: boolean) => {
                 if (openSource || stackScopesTreeView.visible) {
                     const item = stackDataProvider.findFrameItem(snapshot, frame);

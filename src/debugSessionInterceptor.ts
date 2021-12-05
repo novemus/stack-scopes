@@ -87,6 +87,14 @@ export class StackSnapshot {
         return this._threads;
     }
 
+    async hasThread(thread: number): Promise<boolean> {
+        const threads = await this.threads();
+        if (threads !== undefined) {
+            return threads.find(th => th.id === thread);
+        }
+        return false;
+    }
+
     async frames(thread: number): Promise<readonly any[] | undefined> {
         if (!this._frames.has(thread)) {
             this._frames.set(thread, new Promise(async (resolve, reject) => {
@@ -385,5 +393,9 @@ export class DebugSessionInterceptor implements vscode.DebugAdapterTrackerFactor
 
     getSnapshot(id: string): StackSnapshot | undefined {
         return this.sessions.get(id);
+    }
+
+    getSnapshots(): StackSnapshot[] | undefined {
+        return Array.from(this.sessions.values());
     }
 }
