@@ -124,8 +124,8 @@ export class DebugSessionScope extends ScopeDataItem {
                     reject(error);
                 }
             });
-            return this.children;
         }
+        return this.children;
     }
     getParent() : vscode.ProviderResult<ScopeDataItem> {
         return undefined;

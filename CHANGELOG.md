@@ -39,3 +39,7 @@
 ## 1.3.4 (December 4, 2021)
 
 - Fixed highlighting of `this` variables.
+
+## 1.3.5 (December 5, 2021)
+
+- Fixed the bug when refreshing the scopes tree.
