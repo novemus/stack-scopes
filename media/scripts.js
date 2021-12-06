@@ -359,7 +359,7 @@ class Context {
                 }
             });
 
-            if (scroll) {
+            if (scroll !== undefined && (scroll < 0 || scroll > window.innerHeight)) {
                 window.scrollBy(0, scroll);
             }
         } else {
