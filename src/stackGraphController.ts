@@ -78,9 +78,7 @@ export class StackGraphController implements StackSnapshotReviewer {
                 const active = snapshots.find(s => s.id === id);
                 if (active) {
                     const select = await vscode.window.showQuickPick(
-                        snapshots
-                            .filter(s => s.id !== active.id && s.procId === active.procId && s.procName === active.procName)
-                            .map(s => { return { label: s.name, snapshot: s }; }), {
+                        snapshots.filter(s => s.id !== active.id).map(s => { return { label: s.name, snapshot: s }; }), {
                         title: 'Compare With...'
                     });
                     const target = select?.snapshot;
