@@ -150,8 +150,20 @@
           "when": "false"
         },
         {
-          "command": "stackScopes.revealReferenceOnGraph",
-          "when": "false"
+          "command": "stackScopes.drawOnlyColorizedStacks",
+          "when": "stackScopes.stackGraph"
+        },
+        {
+          "command": "stackScopes.drawAllStacks",
+          "when": "stackScopes.stackGraph"
+        },
+        {
+          "command": "stackScopes.colorizeMatches",
+          "when": "stackScopes.stackGraph && stackScopes.multisession && !stackScopes.colorizeMatches"
+        },
+        {
+          "command": "stackScopes.clearMatches",
+          "when": "stackScopes.stackGraph && stackScopes.multisession && stackScopes.colorizeMatches"
         }
       ],
       "view/title": [
@@ -206,12 +218,12 @@
         },
         {
           "command": "stackScopes.colorizeMatches",
-          "when": "stackScopes.stackGraph && !stackScopes.colorizeMatches",
+          "when": "stackScopes.stackGraph && stackScopes.multisession && !stackScopes.colorizeMatches",
           "group": "navigation"
         },
         {
           "command": "stackScopes.clearMatches",
-          "when": "stackScopes.stackGraph && stackScopes.colorizeMatches",
+          "when": "stackScopes.stackGraph && stackScopes.multisession && stackScopes.colorizeMatches",
           "group": "navigation"
         }
       ]

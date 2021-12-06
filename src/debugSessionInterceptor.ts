@@ -352,11 +352,13 @@ export class DebugSessionInterceptor implements vscode.DebugAdapterTrackerFactor
                     const snapshot = new StackSnapshot(session, message.body.threadId);
                     this.sessions.set(session.id, snapshot);
                     this.reviewers.forEach(r => r.onSnapshotCreated(snapshot));
+                    vscode.commands.executeCommand('setContext', 'stackScopes.multisession', this.sessions.size > 1);
                 } else if (message.type === 'response' && message.command === 'continue' || message.command === 'next' || message.command === 'stepIn' || message.command === 'stepOut') {
                     const snapshot = this.sessions.get(session.id);
                     if (snapshot) {
                         this.reviewers.forEach(r => r.onSnapshotRemoved(snapshot));
                         this.sessions.delete(session.id);
+                        vscode.commands.executeCommand('setContext', 'stackScopes.multisession', this.sessions.size > 1);
                     }
                 }
             },
@@ -365,6 +367,7 @@ export class DebugSessionInterceptor implements vscode.DebugAdapterTrackerFactor
                 if (snapshot) {
                     this.reviewers.forEach(r => r.onSnapshotRemoved(snapshot));
                     this.sessions.delete(session.id);
+                    vscode.commands.executeCommand('setContext', 'stackScopes.multisession', this.sessions.size > 1);
                 }
             }
         };
