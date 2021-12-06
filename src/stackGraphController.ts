@@ -32,7 +32,7 @@ class DrawMode {
 export class StackGraphController implements StackSnapshotReviewer {
     private graphs: Map<string, vscode.WebviewPanel> = new Map<string, vscode.WebviewPanel>();
     private modes: Map<vscode.WebviewPanel, DrawMode> = new Map<vscode.WebviewPanel, DrawMode>();
-    
+
     constructor(private readonly context: vscode.ExtensionContext) {
     }
 
@@ -88,35 +88,39 @@ export class StackGraphController implements StackSnapshotReviewer {
                         const threads = await active.threads() || [];
                         for (const thread of threads) {
                             const frames = await active.frames(thread.id);
-                            const samples = await target.frames(thread.id);
-                            if (frames !== undefined && samples !== undefined) {
-                                const match = {
-                                    thread: thread.id,
-                                    frames: [] as number[]
-                                };
-                                for (let i = 1; i <= frames.length && i <= samples.length; ++i) {
-                                    if (samples[samples.length - i].instructionPointerReference === frames[frames.length - i].instructionPointerReference) {
-                                        const frameObj = await active.getFrameVariable(frames[frames.length - i].id, 'this');
-                                        const sampleObj = await target.getFrameVariable(samples[samples.length - i].id, 'this');
-                                        if (frameObj && sampleObj && frameObj.memoryReference === sampleObj.memoryReference) {
-                                            match.frames.push(frames[frames.length - i].id);
-                                        } else if (frameObj === undefined && sampleObj === undefined) {
-                                            match.frames.push(frames[frames.length - i].id);
+                            if (await target.hasThread(thread.id)) {
+                                const samples = await target.frames(thread.id);
+                                if (frames !== undefined && samples !== undefined) {
+                                    const match = {
+                                        thread: thread.id,
+                                        frames: [] as number[]
+                                    };
+                                    for (let i = 1; i <= frames.length && i <= samples.length; ++i) {
+                                        if (samples[samples.length - i].instructionPointerReference === frames[frames.length - i].instructionPointerReference) {
+                                            const frameObj = await active.getFrameVariable(frames[frames.length - i].id, 'this');
+                                            const sampleObj = await target.getFrameVariable(samples[samples.length - i].id, 'this');
+                                            if (frameObj && sampleObj && frameObj.memoryReference === sampleObj.memoryReference) {
+                                                match.frames.push(frames[frames.length - i].id);
+                                            } else if (frameObj === undefined && sampleObj === undefined) {
+                                                match.frames.push(frames[frames.length - i].id);
+                                            } else {
+                                                break;
+                                            }
                                         } else {
                                             break;
                                         }
-                                    } else {
-                                        break;
                                     }
+                                    matches.push(match);
                                 }
-                                matches.push(match);
                             }
                         };
-                        panel.webview.postMessage({ command: 'colorize-matches', matches });
-                        let mode = this.modes.get(panel) || new DrawMode();
-                        mode.colorizeMatches = true;
-                        this.modes.set(panel, mode);
-                        vscode.commands.executeCommand('setContext', 'stackScopes.colorizeMatches', mode.colorizeMatches);
+                        if (matches.length > 0) {
+                            panel.webview.postMessage({ command: 'colorize-matches', matches });
+                            let mode = this.modes.get(panel) || new DrawMode();
+                            mode.colorizeMatches = true;
+                            this.modes.set(panel, mode);
+                            vscode.commands.executeCommand('setContext', 'stackScopes.colorizeMatches', mode.colorizeMatches);
+                        }
                     }
                 }
             }
@@ -225,13 +229,13 @@ export class StackGraphController implements StackSnapshotReviewer {
                     case 'search-references':
                         {
                             const info: VariableInfo = {
-                                getSnapshot() : StackSnapshot {
+                                getSnapshot(): StackSnapshot {
                                     return snapshot;
                                 },
-                                getFrameId() : number {
+                                getFrameId(): number {
                                     return message.frame;
                                 },
-                                getVariable() : any {
+                                getVariable(): any {
                                     return message.variable;
                                 }
                             };
