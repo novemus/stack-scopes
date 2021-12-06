@@ -39,3 +39,7 @@
 ## 1.3.4 (December 4, 2021)
 
 - Fixed highlighting of `this` variables.
+
+## 1.4.0 (December 7, 2021)
+
+- Ability to compare stacks of two dumps.

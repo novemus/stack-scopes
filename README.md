@@ -11,6 +11,7 @@ The `stack-scopes` is extension for [Visual Studio Code](https://code.visualstud
 * [Evaluate](#evaluate-dynamic-arrays-elements) elements of dynamically allocated arrays.
 * [Search](#search-for-references-to-variables) for references to variables.
 * [Work](#graph-drawing-mode) only with the selected stacks on the graph.
+* [Highlight](#compare-two-dumps) matches of two dumps. <span style="background: blue; border-radius: 10px 10px 10px 10px; padding: 0px 4px 2px 4px;">new</span>
 
 ## Scopes view ##
 
@@ -53,6 +54,12 @@ You can search for references to any variable in the frame scopes, as well as in
 It is possible to reduce the number of stacks on the graph. Just highlight some stacks and change the drawing mode by switching the toggle in the top right corner of the graph window.
 
 ![Minimize](https://raw.githubusercontent.com/novemus/stack-scopes/master/resources/minimize.gif)
+
+## Compare two dumps ##
+
+Now you can compare the stacks of two core dumps got from some process and highlight the matches on the `Stack Graph`. To do this, run debugging sessions for your core dumps, open graph window of some session, then select the session to compare using `Colorize Matches` button in the top right corner of the graph window.
+
+![Compare](https://raw.githubusercontent.com/novemus/stack-scopes/master/resources/compare.gif)
 
 ## Requirements
 

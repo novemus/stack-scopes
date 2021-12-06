@@ -347,7 +347,6 @@ export class DebugSessionInterceptor implements vscode.DebugAdapterTrackerFactor
     createDebugAdapterTracker(session: vscode.DebugSession): vscode.ProviderResult<vscode.DebugAdapterTracker> {
         return {
             onDidSendMessage: message => {
-                console.log(JSON.stringify(message, null, '\t'));
                 if (message.type === 'event' && message.event === 'stopped') {
                     const snapshot = new StackSnapshot(session, message.body.threadId);
                     this.sessions.set(session.id, snapshot);
