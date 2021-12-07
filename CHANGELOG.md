@@ -43,3 +43,7 @@
 ## 1.3.5 (December 5, 2021)
 
 - Fixed the bug when refreshing the scopes tree.
+
+## 1.4.0 (December 7, 2021)
+
+- Ability to compare stacks of two dumps.

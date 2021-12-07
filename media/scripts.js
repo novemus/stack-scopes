@@ -11,6 +11,7 @@ class Frame {
     createFrameDomElement() {
         const line = document.createElement('tr');
         line.className = 'frame-line';
+        line.setAttribute('frame', this.id);
         line.addEventListener('click', event => {
             if (event.ctrlKey || event.buttons === 2) {
                 const elements = document.querySelectorAll('[tag=' + event.target.getAttribute('tag') + ']');
@@ -163,6 +164,7 @@ class Stack {
 
         const label = document.createElement("span");
         label.textContent = 'Thread #' + this.thread;
+        label.setAttribute('thread', this.thread);
         label.className = 'thread-badge';
         label.addEventListener('click', event => {
             if (event.ctrlKey || event.buttons === 2) {
@@ -211,8 +213,8 @@ class Context {
         });
 
         document.addEventListener('contextmenu', event => {
-            event.preventDefault();
             if (event.target.className === 'var-line' || event.target.parentNode.className === 'var-line') {
+                event.preventDefault();
                 if (menu.style.display === 'block') {
                     menu.style.display = 'none';
                 } else {
@@ -271,6 +273,8 @@ class Context {
             if (block) {
                 if (block.firstChild.style.borderColor !== 'var(--vscode-editorIndentGuide-background)' && block.firstChild.style.borderColor !== '') {
                     block.style.display = 'inline-block';
+                } else if (block.firstChild.firstChild.firstChild.style.color === 'var(--vscode-editorLink-activeForeground)') {
+                    block.style.display = 'inline-block';
                 } else {
                     const tagged = block.querySelectorAll('[tag]');
                     const colorized = [...tagged].find(element => element.style.backgroundColor !== '');
@@ -298,6 +302,41 @@ class Context {
         this.stacks = [];
     }
 
+    colorizeMatches(matches) {
+        const color = 'var(--vscode-editorLink-activeForeground)';
+        matches.forEach(match => {
+            const thread = document.querySelector('[thread="' + match.thread + '"]');
+            if (thread) {
+                thread.style.color = color;
+                match.frames.forEach(id => {
+                    const frame = document.querySelector('[frame="' + id + '"]');
+                    if (frame) {
+                        frame.style.color = color;
+                    }
+                });
+            }
+        });
+
+        if(!this.drawAll) {
+            this.showColorized();
+        }
+    }
+
+    clearMatches() {
+        const threads = document.querySelectorAll('[thread]');
+        threads.forEach(thread => {
+            thread.style.color = '';
+        });
+        const frames = document.querySelectorAll('[frame]');
+        frames.forEach(frame => {
+            frame.style.color = '';
+        });
+
+        if(!this.drawAll) {
+            this.showColorized();
+        }
+    }
+
     colorizeByTag(tag) {
         const elements = document.querySelectorAll('[tag=' + tag + ']');
         if (elements && elements[0].style.backgroundColor === '') {
@@ -320,7 +359,7 @@ class Context {
                 }
             });
 
-            if (scroll) {
+            if (scroll !== undefined && (scroll < 0 || scroll > window.innerHeight)) {
                 window.scrollBy(0, scroll);
             }
         } else {
@@ -502,6 +541,16 @@ class Context {
             case 'colorize-by-tag': {
                 console.log('colorize by tag');
                 context.colorizeByTag(message.tag);
+                break;
+            }
+            case 'colorize-matches': {
+                console.log('colorize matches');
+                context.colorizeMatches(message.matches);
+                break;
+            }
+            case 'clear-matches': {
+                console.log('clear matches');
+                context.clearMatches();
                 break;
             }
             case 'populate-scope': {

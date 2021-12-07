@@ -87,6 +87,14 @@ export class StackSnapshot {
         return this._threads;
     }
 
+    async hasThread(thread: number): Promise<boolean> {
+        const threads = await this.threads();
+        if (threads !== undefined) {
+            return threads.find(th => th.id === thread);
+        }
+        return false;
+    }
+
     async frames(thread: number): Promise<readonly any[] | undefined> {
         if (!this._frames.has(thread)) {
             this._frames.set(thread, new Promise(async (resolve, reject) => {
@@ -343,11 +351,13 @@ export class DebugSessionInterceptor implements vscode.DebugAdapterTrackerFactor
                     const snapshot = new StackSnapshot(session, message.body.threadId);
                     this.sessions.set(session.id, snapshot);
                     this.reviewers.forEach(r => r.onSnapshotCreated(snapshot));
+                    vscode.commands.executeCommand('setContext', 'stackScopes.multisession', this.sessions.size > 1);
                 } else if (message.type === 'response' && message.command === 'continue' || message.command === 'next' || message.command === 'stepIn' || message.command === 'stepOut') {
                     const snapshot = this.sessions.get(session.id);
                     if (snapshot) {
                         this.reviewers.forEach(r => r.onSnapshotRemoved(snapshot));
                         this.sessions.delete(session.id);
+                        vscode.commands.executeCommand('setContext', 'stackScopes.multisession', this.sessions.size > 1);
                     }
                 }
             },
@@ -356,6 +366,7 @@ export class DebugSessionInterceptor implements vscode.DebugAdapterTrackerFactor
                 if (snapshot) {
                     this.reviewers.forEach(r => r.onSnapshotRemoved(snapshot));
                     this.sessions.delete(session.id);
+                    vscode.commands.executeCommand('setContext', 'stackScopes.multisession', this.sessions.size > 1);
                 }
             }
         };
@@ -381,5 +392,9 @@ export class DebugSessionInterceptor implements vscode.DebugAdapterTrackerFactor
 
     getSnapshot(id: string): StackSnapshot | undefined {
         return this.sessions.get(id);
+    }
+
+    getSnapshots(): StackSnapshot[] | undefined {
+        return Array.from(this.sessions.values());
     }
 }

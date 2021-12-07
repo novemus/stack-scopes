@@ -60,6 +60,7 @@ export class StackScopesDataProvider implements vscode.TreeDataProvider<ScopeDat
     async onSnapshotCreated(snapshot: StackSnapshot) {
         this._sessions.set(snapshot.id, new DebugSessionScope(snapshot));
         this._onDidChangeTreeData.fire();
+        vscode.commands.executeCommand('stackScopes.revealScopeTreeItem', this._sessions.get(snapshot.id));
     }
 }
 
