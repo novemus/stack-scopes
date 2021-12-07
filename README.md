@@ -11,7 +11,8 @@ The `stack-scopes` is extension for [Visual Studio Code](https://code.visualstud
 * [Evaluate](#evaluate-dynamic-arrays-elements) elements of dynamically allocated arrays.
 * [Search](#search-for-references-to-variables) for references to variables.
 * [Work](#graph-drawing-mode) only with the selected stacks on the graph.
-* [Highlight](#compare-two-dumps) matches of two dumps. <span style="background: blue; border-radius: 10px 10px 10px 10px; padding: 0px 4px 2px 4px;">new</span>
+* [Highlight](#compare-two-dumps) matches of two dumps. [**NEW**](#compare-two-dumps)
+
 
 ## Scopes view ##
 

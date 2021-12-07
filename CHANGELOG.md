@@ -47,3 +47,7 @@
 ## 1.4.0 (December 7, 2021)
 
 - Ability to compare stacks of two dumps.
+
+## 1.4.1 (December 7, 2021)
+
+- Fixed readme.
