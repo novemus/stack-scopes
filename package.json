@@ -2,7 +2,7 @@
   "name": "stack-scopes",
   "displayName": "Stack Scopes",
   "description": "Analyzing C/C++ Stack Snapshots",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "publisher": "novemus",
   "author": {
     "name": "Novemus Band"
@@ -65,7 +65,7 @@
         "command": "stackScopes.openStackGraph",
         "title": "Open Stack Graph",
         "icon": "$(graph)",
-        "enablement": "inDebugMode && debugType == 'cppdbg' || debugType == 'cppvsdbg'",
+        "enablement": "inDebugMode && (debugType == 'cppdbg' || debugType == 'cppvsdbg' || debugType == 'lldb')",
         "category": "Stack Graph"
       },
       {
@@ -102,28 +102,28 @@
         "command": "stackScopes.drawOnlyColorizedStacks",
         "title": "Draw Only Colorized Stacks",
         "icon": "$(screen-normal)",
-        "enablement": "inDebugMode && debugType == 'cppdbg' || debugType == 'cppvsdbg'",
+        "enablement": "inDebugMode && (debugType == 'cppdbg' || debugType == 'cppvsdbg' || debugType == 'lldb')",
         "category": "Stack Graph"
       },
       {
         "command": "stackScopes.drawAllStacks",
         "title": "Draw All Stacks",
         "icon": "$(screen-full)",
-        "enablement": "inDebugMode && debugType == 'cppdbg' || debugType == 'cppvsdbg'",
+        "enablement": "inDebugMode && (debugType == 'cppdbg' || debugType == 'cppvsdbg' || debugType == 'lldb')",
         "category": "Stack Graph"
       },
       {
         "command": "stackScopes.colorizeMatches",
         "title": "Colorize Matches",
         "icon": "$(color-mode)",
-        "enablement": "inDebugMode && debugType == 'cppdbg' || debugType == 'cppvsdbg'",
+        "enablement": "inDebugMode && (debugType == 'cppdbg' || debugType == 'cppvsdbg' || debugType == 'lldb')",
         "category": "Stack Graph"
       },
       {
         "command": "stackScopes.clearMatches",
         "title": "Clear Matches",
         "icon": "$(circle-slash)",
-        "enablement": "inDebugMode && debugType == 'cppdbg' || debugType == 'cppvsdbg'",
+        "enablement": "inDebugMode && (debugType == 'cppdbg' || debugType == 'cppvsdbg' || debugType == 'lldb')",
         "category": "Stack Graph"
       }
     ],

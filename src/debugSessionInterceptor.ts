@@ -61,7 +61,7 @@ export class StackSnapshot {
         if (!this._modules) {
             this._modules = new Promise(async (resolve, reject) => {
                 try {
-                    const { modules } = await this.session.customRequest('modules', { startModule: 0, moduleCount: 0});
+                    const { modules } = await this.session.customRequest('modules', { startModule: 0, moduleCount: 10000});
                     resolve(modules);
                 } catch (error) {
                     console.log(error);
@@ -133,7 +133,7 @@ export class StackSnapshot {
                 if (module !== undefined) {
                     result.set(module.id, module);
                 } else {
-                    result.set(-1, { name: '', id: -1 });
+                    result.set(-1, { name: 'unknown', id: -1 });
                 }
             }
         }
@@ -194,7 +194,7 @@ export class StackSnapshot {
     async getFrameVariables(frame: number): Promise<readonly any[] | undefined> {
         const scopes = await this.getScopes(frame) || [];
         for(const scope of scopes) {
-            if (scope.name === "Locals" || scope.presentationHint === 'locals') {
+            if (scope.name === "Local" || scope.name === "Locals" || scope.presentationHint === 'locals') {
                 return await this.getVariables(scope.variablesReference);
             }
         }
@@ -205,7 +205,7 @@ export class StackSnapshot {
         return new Promise(async (resolve, reject) => {
             try {
                 const result = await this.session.customRequest('evaluate', {
-                    expression: expression,
+                    expression: this.session.type == 'lldb' && this.session.configuration?.expressions != 'native' ? '${' + expression + '}' : expression,
                     frameId: frame
                 });
                 resolve(result);
@@ -342,6 +342,7 @@ export class DebugSessionInterceptor implements vscode.DebugAdapterTrackerFactor
     constructor(context: vscode.ExtensionContext) {
         context.subscriptions.push(vscode.debug.registerDebugAdapterTrackerFactory('cppdbg', this));
         context.subscriptions.push(vscode.debug.registerDebugAdapterTrackerFactory('cppvsdbg', this));
+        context.subscriptions.push(vscode.debug.registerDebugAdapterTrackerFactory('lldb', this));
     }
 
     createDebugAdapterTracker(session: vscode.DebugSession): vscode.ProviderResult<vscode.DebugAdapterTracker> {

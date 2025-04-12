@@ -51,3 +51,7 @@
 ## 1.4.1 (December 7, 2021)
 
 - Fixed readme.
+
+## 1.4.2 (April 12, 2025)
+
+- Support `lldb` debug profile.

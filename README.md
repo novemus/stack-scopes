@@ -1,6 +1,6 @@
 # README
 
-The `stack-scopes` is extension for [Visual Studio Code](https://code.visualstudio.com). It provides additional `Scopes` view on the Debug side bar for `cppdbg` and `cppvsdbg` debug profiles and offers `Stack Graph` window for convenient analysis of application stacks.
+The `stack-scopes` is extension for [Visual Studio Code](https://code.visualstudio.com). It provides additional `Scopes` view on the Debug side bar for `cppdbg`, `cppvsdbg` and `lldb` debug profiles and offers `Stack Graph` window for convenient analysis of application stacks.
 
 ## Сapabilities
 
@@ -11,7 +11,7 @@ The `stack-scopes` is extension for [Visual Studio Code](https://code.visualstud
 * [Evaluate](#evaluate-dynamic-arrays-elements) elements of dynamically allocated arrays.
 * [Search](#search-for-references-to-variables) for references to variables.
 * [Work](#graph-drawing-mode) only with the selected stacks on the graph.
-* [Highlight](#compare-two-dumps) matches of two dumps. [**NEW**](#compare-two-dumps)
+* [Highlight](#compare-two-dumps) matches of two dumps.
 
 
 ## Scopes view ##
